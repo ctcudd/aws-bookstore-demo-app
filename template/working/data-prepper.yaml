@@ -1,0 +1,239 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  NetworkStackName:
+    Description: Used as a prefix for project resources.  Can be up to 12 characters, lowercase letters (a-z) only.
+    Type: String
+  ElasticsearchStackName:
+    Description: Used as a prefix for project resources.  Can be up to 12 characters, lowercase letters (a-z) only.
+    Type: String
+  DataPrepperVersion:
+    Description: Version of Data Prepper to download and run
+    Type: String
+    AllowedPattern: "[0-9]+\\.[0-9]+\\.[0-9]+[a-z-]*"
+    Default: "1.0.0"
+    ConstraintDescription: must be a valid release number
+  DataPrepperInstanceType:
+    Description: EC2 instance type
+    Type: String
+    AllowedPattern: "[a-z0-9]+\\.[a-z0-9]+"
+    Default: t2.medium
+    ConstraintDescription: cannot be empty
+  DataPrepperKeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: cannot be empty
+  DataPrepperLatestAmi:
+    Description: AMI to deploy to EC2, defaults to Amazon Linux 2
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-ebs"
+  DataPrepperSSHLocation:
+    Description: The IP address range that can be used to SSH to the EC2 instances
+    Type: String
+    MinLength: "9"
+    MaxLength: "18"
+    Default: 0.0.0.0/0
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  ELBType:
+    Type: String
+    Default: network
+  ELBIpAddressType:
+    Type: String
+    AllowedValues:
+      - ipv4
+      - dualstack
+    Default: ipv4
+Resources:
+
+  DataPrepperSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH access via port 22
+      VpcId: !ImportValue {"Fn::Sub": "${NetworkStackName}-VPCID"}
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: "22"
+          ToPort: "22"
+          CidrIp: !Ref DataPrepperSSHLocation
+        - IpProtocol: tcp
+          FromPort: "21890"
+          ToPort: "21890"
+          CidrIp: 0.0.0.0/0
+#          CidrIp: !ImportValue {"Fn::Sub": "${NetworkStackName}-VPCCIDRBlock"}
+        - IpProtocol: tcp
+          FromPort: "4900"
+          ToPort: "4900"
+          CidrIp: 0.0.0.0/0
+
+  DataPrepperGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      HealthCheckType: ELB
+      LaunchConfigurationName: !Ref DataPrepperLaunchConfig
+      MinSize: 1
+      MaxSize: 3
+      TargetGroupARNs: [!Ref InternalTargetGroup, !Ref PublicTargetGroup]
+      VPCZoneIdentifier: [!ImportValue {"Fn::Sub": "${NetworkStackName}-PublicSubnet"}]
+      Tags:
+        - Key: Name
+          Value: !Join ["",[!ImportValue {"Fn::Sub": "${NetworkStackName}-ProjectName"},"-DataPrepperServers"]]
+          PropagateAtLaunch: true
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: "PT15M"
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: 1
+        MaxBatchSize: 1
+        PauseTime: "PT15M"
+        WaitOnResourceSignals: true
+
+  PublicLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      Subnets: [!ImportValue {"Fn::Sub": "${NetworkStackName}-PublicSubnet"}]
+      Type: !Ref ELBType
+      IpAddressType: !Ref ELBIpAddressType
+
+  InternalLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internal
+      Subnets: [!ImportValue {"Fn::Sub": "${NetworkStackName}-PublicSubnet"}]
+      Type: !Ref ELBType
+      IpAddressType: !Ref ELBIpAddressType
+
+  InternalTargetGroup:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      Name: !Join ["",[!ImportValue {"Fn::Sub": "${NetworkStackName}-ProjectName"},"-PrivTG"]]
+      Port: 21890
+      Protocol: TCP
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '60'
+      VpcId: !ImportValue {"Fn::Sub": "${NetworkStackName}-VPCID"}
+
+  PublicTargetGroup:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      Name: !Join ["",[!ImportValue {"Fn::Sub": "${NetworkStackName}-ProjectName"},"-PubTG"]]
+      Port: 21890
+      Protocol: TCP
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '60'
+      VpcId: !ImportValue {"Fn::Sub": "${NetworkStackName}-VPCID"}
+
+  PublicListener:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    DependsOn: PublicTargetGroup
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref PublicTargetGroup
+      LoadBalancerArn: !Ref PublicLoadBalancer
+      Port: '21890'
+      Protocol: TCP
+
+  InternalListener:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    DependsOn: InternalTargetGroup
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref InternalTargetGroup
+      LoadBalancerArn: !Ref InternalLoadBalancer
+      Port: '21890'
+      Protocol: TCP
+
+  DataPrepperLaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          default:
+            - 01_config-data-prepper
+        01_config-data-prepper:
+          files:
+            "/etc/data-prepper/data-prepper-config.yaml":
+              content: !Sub |
+                ssl: false
+              mode: "000400"
+              owner: root
+              group: root
+            "/etc/data-prepper/pipelines.yaml":
+              content: !Sub
+                - |
+                  entry-pipeline:
+                    delay: "100"
+                    source:
+                      otel_trace_source:
+                        ssl: false
+                        health_check_service: true
+                    sink:
+                      - pipeline:
+                          name: "raw-pipeline"
+                      - pipeline:
+                          name: "service-map-pipeline"
+                  raw-pipeline:
+                    source:
+                      pipeline:
+                        name: "entry-pipeline"
+                    prepper:
+                      - otel_trace_raw_prepper:
+                    sink:
+                      - elasticsearch:
+                           hosts: [ "https://${ElasticsearchDomainEndpoint}" ]
+                           aws_sigv4: true
+                           aws_region: "${AWS::Region}"
+                           trace_analytics_raw: true
+                  service-map-pipeline:
+                    delay: "100"
+                    source:
+                      pipeline:
+                        name: "entry-pipeline"
+                    prepper:
+                      - service_map_stateful:
+                    sink:
+                      - elasticsearch:
+                           hosts: [ "https://${ElasticsearchDomainEndpoint}" ]
+                           aws_sigv4: true
+                           aws_region: "${AWS::Region}"
+                           trace_analytics_service_map: true
+                - { ElasticsearchDomainEndpoint: !ImportValue {"Fn::Sub": "${ElasticsearchStackName}-DomainEndpoint"} }
+              mode: "000400"
+              owner: root
+              group: root
+    Properties:
+      InstanceType: !Ref DataPrepperInstanceType
+      KeyName: !Ref DataPrepperKeyName
+      ImageId: !Ref DataPrepperLatestAmi
+      SecurityGroups: [!Ref DataPrepperSecurityGroup]
+      UserData:
+        # Script to download and run Data Prepper
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          export RELEASE=opendistroforelasticsearch-data-prepper-${DataPrepperVersion}-linux-x64
+          yum install java-11-amazon-corretto-headless -y
+          wget https://github.com/opendistro-for-elasticsearch/data-prepper/releases/download/v${DataPrepperVersion}/$RELEASE.tar.gz -O /tmp/$RELEASE.tar.gz
+          tar -xzf /tmp/$RELEASE.tar.gz --directory /usr/local/bin
+          /opt/aws/bin/cfn-init -v --stack ${AWS::StackId} --resource DataPrepperLaunchConfig --region ${AWS::Region} --configsets default
+          nohup /usr/local/bin/$RELEASE/data-prepper-tar-install.sh /etc/data-prepper/pipelines.yaml /etc/data-prepper/data-prepper-config.yaml > /var/log/data-prepper.out &
+          /opt/aws/bin/cfn-signal --stack ${AWS::StackId} --resource DataPrepperGroup --region ${AWS::Region}
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: "PT15M"
+
+Outputs:
+  PublicDNS:
+    Export:
+      Name: !Sub ${AWS::StackName}-PublicDNS
+    Value: !GetAtt PublicLoadBalancer.DNSName
+  PrivateDNS:
+    Export:
+      Name: !Sub ${AWS::StackName}-PrivateDNS
+    Value: !GetAtt InternalLoadBalancer.DNSName

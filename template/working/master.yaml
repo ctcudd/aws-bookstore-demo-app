@@ -1,0 +1,32 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  ProjectName:
+    Description: Used as a prefix for project resources.  Can be up to 12 characters, lowercase letters (a-z) only.
+    Type: String
+    Default: mybookstore
+    AllowedPattern: "^[a-z]{1,12}"
+    ConstraintDescription: The ProjectName can be up to 12 characters, lowercase letters (a-z) only.
+
+Resources:
+
+  network:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Sub https://s3-${AWS::Region}.amazonaws.com/ee-assets-prod-${AWS::Region}/modules/09f302bc1c3b49efa121cb0cc01302d3/v1/network.yaml
+      Parameters:
+        ProjectName: !Ref ProjectName
+
+  elasticsearch:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Sub https://s3-${AWS::Region}.amazonaws.com/ee-assets-prod-${AWS::Region}/modules/09f302bc1c3b49efa121cb0cc01302d3/v1/es.yaml
+      Parameters:
+        NetworkStackName: !GetAtt network.Outputs.StackName
+
+  dataprepper:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Sub https://s3-${AWS::Region}.amazonaws.com/ee-assets-prod-${AWS::Region}/modules/09f302bc1c3b49efa121cb0cc01302d3/v1/data-prepper.yaml
+      Parameters:
+        NetworkStackName: !GetAtt network.Outputs.StackName
+        ElasticsearchDomainEndpoint: !GetAtt elasticsearch.Outputs.DomainEndpoint

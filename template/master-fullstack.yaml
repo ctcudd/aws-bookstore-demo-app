@@ -263,10 +263,52 @@ Resources:
           FromPort: "21890"
           ToPort: "21890"
           CidrIp: !GetAtt bookstoreVPC.CidrBlock
+        - IpProtocol: tcp
+          FromPort: "4900"
+          ToPort: "4900"
+          CidrIp: !GetAtt bookstoreVPC.CidrBlock
 
-  DataPrepperInstance:
+  DataPrepperGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchConfigurationName: !Ref DataPrepperLaunchConfig
+      LoadBalancerNames: [!Ref DataPrepperLB]
+      MinSize: 1
+      MaxSize: 3
+      VPCZoneIdentifier: [!Ref bookstorePublicSubnet]
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-DataPrepperServers
+          PropagateAtLaunch: true
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: "PT15M"
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: 1
+        MaxBatchSize: 1
+        PauseTime: "PT15M"
+        WaitOnResourceSignals: true
+
+  DataPrepperLB:
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    Properties:
+      Subnets: [!Ref bookstorePublicSubnet]
+      Listeners:
+        - LoadBalancerPort: 21890
+          InstancePort: 21890
+          Protocol: TCP
+      HealthCheck:
+        Target: HTTP:4900/metrics/sys
+        HealthyThreshold: 3
+        UnhealthyThreshold: 5
+        Interval: 30
+        Timeout: 5
+
+  DataPrepperLaunchConfig:
     DependsOn: [AttachInternetGateway, ElasticsearchDomain]
-    Type: AWS::EC2::Instance
+    Type: AWS::AutoScaling::LaunchConfiguration
     Metadata:
       AWS::CloudFormation::Init:
         configSets:
@@ -322,11 +364,10 @@ Resources:
               owner: root
               group: root
     Properties:
-      SubnetId: !Ref bookstorePublicSubnet
       InstanceType: !Ref DataPrepperInstanceType
       KeyName: !Ref DataPrepperKeyName
       ImageId: !Ref DataPrepperLatestAmi
-      SecurityGroupIds: [!GetAtt DataPrepperSecurityGroup.GroupId]
+      SecurityGroups: !Ref DataPrepperSecurityGroup
       UserData:
         # Script to download and run Data Prepper
         Fn::Base64: !Sub |
@@ -335,13 +376,14 @@ Resources:
           yum install java-11-amazon-corretto-headless -y
           wget https://github.com/opendistro-for-elasticsearch/data-prepper/releases/download/v${DataPrepperVersion}/$RELEASE.tar.gz -O /tmp/$RELEASE.tar.gz
           tar -xzf /tmp/$RELEASE.tar.gz --directory /usr/local/bin
-          /opt/aws/bin/cfn-init -v --stack ${AWS::StackId} --resource DataPrepperInstance --region ${AWS::Region} --configsets default
+          /opt/aws/bin/cfn-init -v --stack ${AWS::StackId} --resource DataPrepperLaunchConfig --region ${AWS::Region} --configsets default
           nohup /usr/local/bin/$RELEASE/data-prepper-tar-install.sh /etc/data-prepper/pipelines.yaml /etc/data-prepper/data-prepper-config.yaml > /var/log/data-prepper.out &
-          /opt/aws/bin/cfn-signal --stack ${AWS::StackId} --resource DataPrepperInstance --region ${AWS::Region}
+          /opt/aws/bin/cfn-signal --stack ${AWS::StackId} --resource DataPrepperGroup --region ${AWS::Region}
     CreationPolicy:
       ResourceSignal:
         Count: 1
         Timeout: "PT15M"
+
 
   # ---------- NEPTUNE CLUSTER DEFINITION ---------
 
@@ -876,6 +918,17 @@ Resources:
                         - TBooks
                         - Arn
                       - /stream/*
+  ElasticsearchSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Rules for allowing access to the ES cluster
+      VpcId: !Ref bookstoreVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '443'
+          ToPort: '443'
+          CidrIp:  !GetAtt bookstoreVPC.CidrBlock
+
   ElasticsearchDomain:
     Type: 'AWS::Elasticsearch::Domain'
     DependsOn:
@@ -890,7 +943,9 @@ Resources:
         InstanceType: t3.medium.elasticsearch
       VPCOptions:
         SubnetIds:
-          - Ref: bookstoreSubnet1
+          - !Ref bookstoreSubnet1
+        SecurityGroupIds:
+          - !Ref ElasticsearchSecurityGroup
       EBSOptions:
         EBSEnabled: true
         Iops: 0
@@ -1107,9 +1162,9 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Sub '${ProjectName}-Orders'
-          AWS_LAMBDA_EXEC_WRAPPER: /opt/otel-instrument
+          AWS_LAMBDA_EXEC_WRAPPER: /opt/otel-handler
           OPENTELEMETRY_COLLECTOR_CONFIG_FILE: /opt/config.yaml
-          DATA_PREPPER_HOST: !GetAtt DataPrepperInstance.PrivateIp
+          DATA_PREPPER_HOST: !GetAtt DataPrepperInstance.PublicIp
       Code:
         S3Bucket: !FindInMap 
           - S3Buckets
@@ -1140,6 +1195,9 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Sub '${ProjectName}-Books'
+          AWS_LAMBDA_EXEC_WRAPPER: /opt/otel-handler
+          OPENTELEMETRY_COLLECTOR_CONFIG_FILE: /opt/config.yaml
+          DATA_PREPPER_HOST: !GetAtt DataPrepperInstance.PublicIp
       Code:
         S3Bucket: !FindInMap 
           - S3Buckets
@@ -1151,6 +1209,7 @@ Resources:
           - GetBookCode
       Layers:
         - !Sub arn:aws:lambda:${AWS::Region}:901920570463:layer:aws-otel-nodejs-ver-0-23-0:1
+        - !Ref CollectorConfigLayer
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 1ae22cac-5803-4077-a6fe-1a3ca1aedfc2
@@ -3235,3 +3294,6 @@ Outputs:
     Value: !Sub
       - https://${Domain}
       - { Domain: !GetAtt AssetsCDN.DomainName }
+  PortForwardCmd:
+    Description: Cmd for tunneling into Kibana
+    Value: !Sub "ssh -i /your/path/to/key.pem -L 9092:${ElasticsearchDomain.DomainEndpoint}:443 -N ec2-user@${DataPrepperInstance.PublicIp}"

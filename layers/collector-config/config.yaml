@@ -1,0 +1,16 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+      http:
+exporters:
+  otlp/data-prepper:
+    endpoint: ${DATA_PREPPER_HOST}:21890
+    insecure: true
+  logging:
+    loglevel: debug
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [otlp/data-prepper]

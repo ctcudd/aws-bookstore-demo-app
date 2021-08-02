@@ -1,0 +1,525 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  ProjectName:
+    Description: Used as a prefix for project resources.  Can be up to 12 characters, lowercase letters (a-z) only.
+    Type: String
+    Default: mybookstore
+    AllowedPattern: "^[a-z]{1,12}"
+    ConstraintDescription: The ProjectName can be up to 12 characters, lowercase letters (a-z) only.
+  DataPrepperVersion:
+    Description: Version of Data Prepper to download and run
+    Type: String
+    AllowedPattern: "[0-9]+\\.[0-9]+\\.[0-9]+[a-z-]*"
+    Default: "1.0.0"
+    ConstraintDescription: must be a valid release number
+  DataPrepperInstanceType:
+    Description: EC2 instance type
+    Type: String
+    AllowedPattern: "[a-z0-9]+\\.[a-z0-9]+"
+    Default: t2.medium
+    ConstraintDescription: cannot be empty
+  DataPrepperKeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: cannot be empty
+  DataPrepperLatestAmi:
+    Description: AMI to deploy to EC2, defaults to Amazon Linux 2
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-ebs"
+  DataPrepperSSHLocation:
+    Description: The IP address range that can be used to SSH to the EC2 instances
+    Type: String
+    MinLength: "9"
+    MaxLength: "18"
+    Default: 0.0.0.0/0
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+Conditions:
+  IADRegion: !Equals [!Ref "AWS::Region", "us-east-1"]
+Mappings:
+  S3Buckets:
+    us-east-1:
+      Bucket: aws-bookstore-demo
+      NeptuneDataBucket: bookstore-neptune
+      SeederFunctionBucket: fsd-aws-wildrydes-us-east-1
+      CollectorConfigBucket: ee-assets-prod-us-east-1
+    us-west-2:
+      Bucket: aws-bookstore-demo-us-west-2
+      NeptuneDataBucket: bookstore-neptune-us-west-2
+      SeederFunctionBucket: fsd-aws-wildrydes-us-west-2
+    eu-central-1:
+      Bucket: aws-bookstore-demo-eu-central-1
+      NeptuneDataBucket: bookstore-neptune-eu-central-1
+      SeederFunctionBucket: fsd-aws-wildrydes-eu-central-1
+    eu-west-1:
+      Bucket: aws-bookstore-demo-eu-west-1
+      NeptuneDataBucket: bookstore-neptune-eu-west-1
+      SeederFunctionBucket: fsd-aws-wildrydes-eu-west-1
+  Constants:
+    AppKeys:
+      SeedRepository: https://s3.amazonaws.com/aws-bookstore-demo/bookstore-webapp.zip
+    S3Keys:
+      CollectorConfigLayer: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/collector-config.zip
+      ListOrdersCode: functions/ListOrders.zip
+      GetBookCode: functions/GetBook.zip
+      ListBooksCode: functions/ListBooks.zip
+      UpdateCartCode: functions/UpdateCart.zip
+      GetCartItemCode: functions/GetCartItem.zip
+      ListItemsInCartCode: functions/ListItemsInCart.zip
+      AddToCartCode: functions/AddToCart.zip
+      RemoveFromCartCode: functions/RemoveFromCart.zip
+      GetBestSellersCode: functions/GetBestSellers.zip
+      CheckoutCode: functions/Checkout.zip
+      UploadBooksCode: functions/UploadBooks.zip
+      GetRecommendationsCode: functions/GetRecommendations.zip
+      GetRecommendationsByBookCode: functions/GetRecommendationsByBook.zip
+      SearchCode: functions/Search.zip
+      UpdateSearchCode: functions/UpdateSearchCluster.zip
+      UpdateBestSellersCode: functions/UpdateBestSellers.zip
+      NeptuneLoaderCode: functions/NeptuneLoader.zip
+      NeptuneIAMCode: functions/NeptuneIAM.zip
+      bookstoreNeptuneS3DataPath: /data/
+      booksData: data/books.json
+      CreateESRoleCode: functions/CreateESRole.zip
+      UpdateConfigCode: functions/UpdateConfig.zip
+      PythonLambdaLayer: functions/PythonLambdaLayer.zip
+      DeleteBucketsCode: functions/DeleteBuckets.zip
+      SeederFunctionCode: aws-serverless-codecommit-seeder.zip
+Resources:
+# ---------- VPC - SUBNET - SECURITY GROUPS  ---------
+
+    bookstoreVPC:
+      Type: "AWS::EC2::VPC"
+      Properties:
+        CidrBlock: '172.31.0.0/16'
+
+    bookstoreSubnet1:
+      Type: "AWS::EC2::Subnet"
+      Properties:
+        CidrBlock:
+          Fn::Select:
+            - 0
+            - Fn::Cidr:
+                - Fn::GetAtt: [bookstoreVPC, CidrBlock]
+                - 3
+                - 8
+        VpcId:
+          Ref: bookstoreVPC
+        AvailabilityZone:
+          Fn::Select:
+            - 0
+            - Fn::GetAZs:
+                Ref: "AWS::Region"
+
+    bookstoreSubnet2:
+      Type: "AWS::EC2::Subnet"
+      Properties:
+        CidrBlock:
+          Fn::Select:
+            - 1
+            - Fn::Cidr:
+                - Fn::GetAtt: [bookstoreVPC, CidrBlock]
+                - 3
+                - 8
+        VpcId:
+          Ref: bookstoreVPC
+        AvailabilityZone:
+          Fn::Select:
+            - 1
+            - Fn::GetAZs:
+                Ref: "AWS::Region"
+
+    bookstorePublicSubnet:
+      Type: "AWS::EC2::Subnet"
+      Properties:
+        MapPublicIpOnLaunch: true
+        CidrBlock:
+          Fn::Select:
+            - 2
+            - Fn::Cidr:
+                - Fn::GetAtt: [bookstoreVPC, CidrBlock]
+                - 3
+                - 8
+        VpcId:
+          Ref: bookstoreVPC
+        AvailabilityZone:
+          Fn::Select:
+            - 0
+            - Fn::GetAZs:
+                Ref: "AWS::Region"
+
+    InternetGateway:
+      Type: 'AWS::EC2::InternetGateway'
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Sub ${ProjectName}-igw
+
+    AttachInternetGateway:
+      Type: 'AWS::EC2::VPCGatewayAttachment'
+      Properties:
+        VpcId: !Ref bookstoreVPC
+        InternetGatewayId: !Ref InternetGateway
+
+    PublicRoutingTable:
+      Type: 'AWS::EC2::RouteTable'
+      DependsOn: [AttachInternetGateway]
+      Properties:
+        VpcId: !Ref bookstoreVPC
+        Tags:
+          - Key: Name
+            Value: !Sub ${ProjectName}-rtbl-pub
+
+    PublicRoute:
+      Type: 'AWS::EC2::Route'
+      Properties:
+        DestinationCidrBlock: 0.0.0.0/0
+        GatewayId: !Ref InternetGateway
+        RouteTableId: !Ref PublicRoutingTable
+
+    PublicRouteAssociation:
+      Type: 'AWS::EC2::SubnetRouteTableAssociation'
+      Properties:
+        RouteTableId: !Ref PublicRoutingTable
+        SubnetId: !Ref bookstorePublicSubnet
+
+    bookstoreVPCRouteTable:
+      Type: AWS::EC2::RouteTable
+      Properties:
+        VpcId: !Ref bookstoreVPC
+
+    bookstoreVPCRouteTableAssociation:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId: !Ref bookstoreVPCRouteTable
+        SubnetId: !Ref bookstoreSubnet1
+
+    bookstoreVPCRouteTableAssociationTwo:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId: !Ref bookstoreVPCRouteTable
+        SubnetId: !Ref bookstoreSubnet2
+
+  # ---------- DATA PREPPER DEFINITION ---------
+    DataPrepperSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: Enable SSH access via port 22
+        VpcId: !Ref bookstoreVPC
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: "22"
+            ToPort: "22"
+            CidrIp: !Ref DataPrepperSSHLocation
+          - IpProtocol: tcp
+            FromPort: "21890"
+            ToPort: "21890"
+            CidrIp: !GetAtt bookstoreVPC.CidrBlock
+          - IpProtocol: tcp
+            FromPort: "4900"
+            ToPort: "4900"
+            CidrIp: !GetAtt bookstoreVPC.CidrBlock
+
+    DataPrepperGroup:
+      Type: AWS::AutoScaling::AutoScalingGroup
+      Properties:
+        LaunchConfigurationName: !Ref DataPrepperLaunchConfig
+        LoadBalancerNames: [!Ref DataPrepperLB]
+        MinSize: 1
+        MaxSize: 3
+        VPCZoneIdentifier: [!Ref bookstorePublicSubnet]
+        Tags:
+          - Key: Name
+            Value: !Sub ${ProjectName}-DataPrepperServers
+            PropagateAtLaunch: true
+      CreationPolicy:
+        ResourceSignal:
+          Count: 1
+          Timeout: "PT15M"
+      UpdatePolicy:
+        AutoScalingRollingUpdate:
+          MinInstancesInService: 1
+          MaxBatchSize: 1
+          PauseTime: "PT15M"
+          WaitOnResourceSignals: true
+
+    DataPrepperLB:
+      Type: AWS::ElasticLoadBalancing::LoadBalancer
+      Properties:
+        Subnets: [!Ref bookstorePublicSubnet]
+        Listeners:
+          - LoadBalancerPort: 21890
+            InstancePort: 21890
+            Protocol: TCP
+        HealthCheck:
+          Target: HTTP:4900/metrics/sys
+          HealthyThreshold: 3
+          UnhealthyThreshold: 5
+          Interval: 30
+          Timeout: 5
+
+    DataPrepperLaunchConfig:
+      DependsOn: [AttachInternetGateway, ElasticsearchDomain]
+      Type: AWS::AutoScaling::LaunchConfiguration
+      Metadata:
+        AWS::CloudFormation::Init:
+          configSets:
+            default:
+              - 01_config-data-prepper
+          01_config-data-prepper:
+            files:
+              "/etc/data-prepper/data-prepper-config.yaml":
+                content: !Sub |
+                  ssl: false
+                mode: "000400"
+                owner: root
+                group: root
+              "/etc/data-prepper/pipelines.yaml":
+                content: !Sub |
+                  entry-pipeline:
+                    delay: "100"
+                    source:
+                      otel_trace_source:
+                        ssl: false
+                        health_check_service: true
+                    sink:
+                      - pipeline:
+                          name: "raw-pipeline"
+                      - pipeline:
+                          name: "service-map-pipeline"
+                  raw-pipeline:
+                    source:
+                      pipeline:
+                        name: "entry-pipeline"
+                    prepper:
+                      - otel_trace_raw_prepper:
+                    sink:
+                      - elasticsearch:
+                           hosts: [ "https://${ElasticsearchDomain.DomainEndpoint}" ]
+                           aws_sigv4: true
+                           aws_region: "${AWS::Region}"
+                           trace_analytics_raw: true
+                  service-map-pipeline:
+                    delay: "100"
+                    source:
+                      pipeline:
+                        name: "entry-pipeline"
+                    prepper:
+                      - service_map_stateful:
+                    sink:
+                      - elasticsearch:
+                           hosts: [ "https://${ElasticsearchDomain.DomainEndpoint}" ]
+                           aws_sigv4: true
+                           aws_region: "${AWS::Region}"
+                           trace_analytics_service_map: true
+                mode: "000400"
+                owner: root
+                group: root
+      Properties:
+        #      SubnetId: !Ref bookstorePublicSubnet
+        InstanceType: !Ref DataPrepperInstanceType
+        KeyName: !Ref DataPrepperKeyName
+        ImageId: !Ref DataPrepperLatestAmi
+        SecurityGroups: [!Ref DataPrepperSecurityGroup]
+        #      SecurityGroupIds: [!GetAtt DataPrepperSecurityGroup.GroupId]
+        UserData:
+          # Script to download and run Data Prepper
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            export RELEASE=opendistroforelasticsearch-data-prepper-${DataPrepperVersion}-linux-x64
+            yum install java-11-amazon-corretto-headless -y
+            wget https://github.com/opendistro-for-elasticsearch/data-prepper/releases/download/v${DataPrepperVersion}/$RELEASE.tar.gz -O /tmp/$RELEASE.tar.gz
+            tar -xzf /tmp/$RELEASE.tar.gz --directory /usr/local/bin
+            /opt/aws/bin/cfn-init -v --stack ${AWS::StackId} --resource DataPrepperLaunchConfig --region ${AWS::Region} --configsets default
+            nohup /usr/local/bin/$RELEASE/data-prepper-tar-install.sh /etc/data-prepper/pipelines.yaml /etc/data-prepper/data-prepper-config.yaml > /var/log/data-prepper.out &
+            /opt/aws/bin/cfn-signal --stack ${AWS::StackId} --resource DataPrepperGroup --region ${AWS::Region}
+      CreationPolicy:
+        ResourceSignal:
+          Count: 1
+          Timeout: "PT15M"
+
+
+      # ---------- ELASTICSEARCH ROLES DEFINITIONS ---------
+    ESSearchRole:
+      Type: 'AWS::IAM::Role'
+      Properties:
+        RoleName: !Sub '${ProjectName}-ESSearchRole'
+        AssumeRolePolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+              Action:
+                - 'sts:AssumeRole'
+        Path: /
+        ManagedPolicyArns:
+          - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+          - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+#          - 'arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess'
+        Policies:
+          - PolicyName: !Sub '${ProjectName}-lambda-policy'
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - 'es:ESHttpPost'
+                    - 'es:ESHttpGet'
+                  Resource: !Join
+                    - ''
+                    - - 'arn:aws:es:'
+                      - !Ref 'AWS::Region'
+                      - ':'
+                      - !Ref 'AWS::AccountId'
+                      - ':'
+                      - domain/
+                      - !Ref ElasticsearchDomain
+                      - /*
+                - Effect: Allow
+                  Action:
+                    - 's3:ListBucket'
+                    - 's3:GetObject'
+                  Resource: !Join
+                    - ''
+                    - - 'arn:aws:s3:::'
+                      - !FindInMap
+                        - S3Buckets
+                        - !Ref 'AWS::Region'
+                        - Bucket
+                      - /*
+
+    ElasticsearchSecurityGroup:
+      Type: 'AWS::EC2::SecurityGroup'
+      Properties:
+        GroupDescription: Rules for allowing access to the ES cluster
+        VpcId: !Ref bookstoreVPC
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: '443'
+            ToPort: '443'
+            CidrIp:  !GetAtt bookstoreVPC.CidrBlock
+
+    ElasticsearchDomain:
+      Type: 'AWS::Elasticsearch::Domain'
+      Properties:
+        DomainName: !Sub '${ProjectName}-domain'
+        ElasticsearchVersion: '7.10'
+        ElasticsearchClusterConfig:
+          DedicatedMasterEnabled: 'false'
+          InstanceCount: '1'
+          ZoneAwarenessEnabled: 'false'
+          InstanceType: t3.medium.elasticsearch
+        VPCOptions:
+          SubnetIds:
+            - Ref: bookstoreSubnet1
+          SecurityGroupIds:
+            - !Ref ElasticsearchSecurityGroup
+        EBSOptions:
+          EBSEnabled: true
+          Iops: 0
+          VolumeSize: 10
+          VolumeType: gp2
+        AccessPolicies:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Principal:
+                AWS: '*'
+              Action:
+                - 'es:*'
+              Resource: !Join
+                - ''
+                - - 'arn:aws:es:'
+                  - !Ref 'AWS::Region'
+                  - ':'
+                  - !Ref 'AWS::AccountId'
+                  - ':'
+                  - domain/
+                  - !Sub '${ProjectName}-domain'
+                  - /*
+        AdvancedOptions:
+          rest.action.multi.allow_explicit_index: true
+
+    # ---------- LAMBDA STREAMING FUNCTIONS ---------
+    CollectorConfigLayer:
+      Type: "AWS::Lambda::LayerVersion"
+      Properties:
+        CompatibleRuntimes:
+          - python3.8
+          - python3.7
+          - python3.6
+          - python2.7
+          - nodejs10.x
+          - java8
+        Content:
+          S3Bucket: !FindInMap
+            - S3Buckets
+            - !Ref 'AWS::Region'
+            - CollectorConfigBucket
+          S3Key: !FindInMap
+            - Constants
+            - S3Keys
+            - CollectorConfigLayer
+    PythonLambdaLayer:
+      Type: "AWS::Lambda::LayerVersion"
+      Properties:
+        CompatibleRuntimes:
+          - python3.7
+          - python3.6
+        Content:
+          S3Bucket: !FindInMap
+            - S3Buckets
+            - !Ref 'AWS::Region'
+            - Bucket
+          S3Key: !FindInMap
+            - Constants
+            - S3Keys
+            - PythonLambdaLayer
+
+    # ---------- LAMBDA FUNCTIONS for ELASTICSEARCH and ELASTICACHE  ---------
+    FunctionSearch:
+      Type: 'AWS::Lambda::Function'
+      DependsOn:
+        - ESSearchRole
+        - ElasticsearchDomain
+      Properties:
+        FunctionName: !Sub '${ProjectName}-Search'
+        Description: Search for books across book names, authors, and categories
+        Handler: index.handler
+        MemorySize: 256
+        Role: !GetAtt
+          - ESSearchRole
+          - Arn
+        Runtime: python3.8
+        Layers:
+          - !Sub arn:aws:lambda:${AWS::Region}:901920570463:layer:aws-otel-python38-ver-1-3-0:1
+          - !Ref PythonLambdaLayer
+          - !Ref CollectorConfigLayer
+        Timeout: '60'
+        TracingConfig:
+          Mode: Active
+        VpcConfig:
+          SecurityGroupIds:
+            - Fn::GetAtt: [bookstoreVPC, DefaultSecurityGroup]
+          SubnetIds:
+            - Ref: bookstoreSubnet1
+        Code:
+          S3Bucket: !FindInMap
+            - S3Buckets
+            - !Ref 'AWS::Region'
+            - Bucket
+          S3Key: !FindInMap
+            - Constants
+            - S3Keys
+            - SearchCode
+        Environment:
+          Variables:
+            ESENDPOINT: !GetAtt
+              - ElasticsearchDomain
+              - DomainEndpoint
+            REGION: !Ref 'AWS::Region'
+            AWS_LAMBDA_EXEC_WRAPPER: /opt/otel-instrument
+            OPENTELEMETRY_COLLECTOR_CONFIG_FILE: /opt/config.yaml
+            DATA_PREPPER_HOST: !GetAtt DataPrepperLB.DNSName
