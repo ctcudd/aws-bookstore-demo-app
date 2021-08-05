@@ -76,15 +76,6 @@ Mappings:
       SearchCode: functions/Search.zip
       UpdateSearchCode: functions/UpdateSearchCluster.zip
       UpdateBestSellersCode: functions/UpdateBestSellers.zip
-      NeptuneLoaderCode: functions/NeptuneLoader.zip
-      NeptuneIAMCode: functions/NeptuneIAM.zip
-      bookstoreNeptuneS3DataPath: /data/
-      booksData: data/books.json
-      CreateESRoleCode: functions/CreateESRole.zip
-      UpdateConfigCode: functions/UpdateConfig.zip
-      PythonLambdaLayer: functions/PythonLambdaLayer.zip
-      DeleteBucketsCode: functions/DeleteBuckets.zip
-      SeederFunctionCode: aws-serverless-codecommit-seeder.zip
 Resources:
 # ---------- VPC - SUBNET - SECURITY GROUPS  ---------
 

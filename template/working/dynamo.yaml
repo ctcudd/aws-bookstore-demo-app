@@ -1,0 +1,190 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  NetworkStackName:
+    Description: name of network stack
+    Type: String
+  ElasticsearchStackName:
+    Description: name of elasticsearch stack
+    Type: String
+  DataPrepperStackName:
+    Description: name of data prepper stack
+    Type: String
+  NeptuneStackName:
+    Description: name of data neptune stack
+    Type: String
+  LayerStackName:
+    Description: name of the lambda layer stack
+    Type: String
+  RedisStackName:
+    Description: name of the reddis stack
+    Type: String
+  ProjectName:
+    Description: Used as a prefix for project resources.  Can be up to 12 characters, lowercase letters (a-z) only.
+    Type: String
+    Default: mybookstore
+    AllowedPattern: "^[a-z]{1,12}"
+    ConstraintDescription: The ProjectName can be up to 12 characters, lowercase letters (a-z) only.
+Conditions:
+  IADRegion: !Equals [!Ref "AWS::Region", "us-east-1"]
+Mappings:
+  S3Buckets:
+    us-east-1:
+      Bucket: aws-bookstore-demo
+      ConfigBucket: ee-assets-prod-us-east-1
+    us-west-2:
+      Bucket: aws-bookstore-demo-us-west-2
+    eu-central-1:
+      Bucket: aws-bookstore-demo-eu-central-1
+    eu-west-1:
+      Bucket: aws-bookstore-demo-eu-west-1
+  Constants:
+    S3Keys:
+      ListOrdersCode: functions/ListOrders.zip
+      GetBookCode: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/functions/GetBook.zip
+      ListBooksCode: functions/ListBooks.zip
+      UpdateCartCode: functions/UpdateCart.zip
+      GetCartItemCode: functions/GetCartItem.zip
+      ListItemsInCartCode: functions/ListItemsInCart.zip
+      AddToCartCode: functions/AddToCart.zip
+      RemoveFromCartCode: functions/RemoveFromCart.zip
+      GetBestSellersCode: functions/GetBestSellers.zip
+      CheckoutCode: functions/Checkout.zip
+      UploadBooksCode: functions/UploadBooks.zip
+      GetRecommendationsCode: functions/GetRecommendations.zip
+      GetRecommendationsByBookCode: functions/GetRecommendationsByBook.zip
+      SearchCode: functions/Search.zip
+      UpdateSearchCode: functions/UpdateSearchCluster.zip
+      UpdateBestSellersCode: functions/UpdateBestSellers.zip
+      booksData: data/books.json
+Resources:
+# ---------- ROLES FOR DYNAMODB ---------
+  DynamoDbRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub '${ProjectName}-DynamoDbLambda'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+        - 'arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess'
+        - 'arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess'
+      Policies:
+        - PolicyName: PutRidePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'dynamodb:PutItem'
+                  - 'dynamodb:Query'
+                  - 'dynamodb:UpdateTable'
+                  - 'dynamodb:UpdateItem'
+                  - 'dynamodb:BatchWriteItem'
+                  - 'dynamodb:GetItem'
+                  - 'dynamodb:Scan'
+                  - 'dynamodb:DeleteItem'
+                Resource:
+                  - !GetAtt 
+                    - TBooks
+                    - Arn
+                  - !GetAtt 
+                    - TOrders
+                    - Arn
+                  - !GetAtt 
+                    - TCart
+                    - Arn
+                  - !Join 
+                    - ''
+                    - - !GetAtt 
+                        - TBooks
+                        - Arn
+                      - /*
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 07b29683-0ea5-44bf-a439-fcb89713fd09
+
+# ---------- DYNAMODB TABLES DEFINITIONS ---------
+  TBooks:
+    Type: 'AWS::DynamoDB::Table'
+    Properties:
+      TableName: !Sub '${ProjectName}-Books'
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: category
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      GlobalSecondaryIndexes:
+        - IndexName: category-index
+          KeySchema:
+            - AttributeName: category
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 9de25578-c943-42f5-9ec7-7a5258c7771a
+  TOrders:
+    Type: 'AWS::DynamoDB::Table'
+    Properties:
+      TableName: !Sub '${ProjectName}-Orders'
+      AttributeDefinitions:
+        - AttributeName: customerId
+          AttributeType: S
+        - AttributeName: orderId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: customerId
+          KeyType: HASH
+        - AttributeName: orderId
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES  
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 57fb3162-6a2d-4651-a9c8-7404e82181e8
+  TCart:
+    Type: 'AWS::DynamoDB::Table'
+    Properties:
+      TableName: !Sub '${ProjectName}-Cart'
+      AttributeDefinitions:
+        - AttributeName: customerId
+          AttributeType: S
+        - AttributeName: bookId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: customerId
+          KeyType: HASH
+        - AttributeName: bookId
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: e1a45038-ec76-464d-91b5-6b31bc325fa7
+Outputs:
+  AppApi:
+    Value: !Ref AppApi
+    Export:
+      Name: !Sub ${AWS::StackName}-AppApi

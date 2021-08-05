@@ -1,0 +1,57 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  NetworkStackName:
+    Description: name of network stack
+    Type: String
+Resources:
+
+  redisLambdaSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      VpcId: !ImportValue {"Fn::Sub": "${NetworkStackName}-VPCID"}
+      GroupDescription: "A component security group allowing access only to redis"
+
+  bookstoreCacheSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Elasticache security group
+      SecurityGroupIngress:
+        -
+          IpProtocol: "tcp"
+          FromPort: "6379"
+          ToPort: "6379"
+          SourceSecurityGroupId:
+            Ref: redisLambdaSecurityGroup
+      VpcId: !ImportValue {"Fn::Sub": "${NetworkStackName}-VPCID"}
+
+  bookstoreCacheSubnets:
+    Type: 'AWS::ElastiCache::SubnetGroup'
+    Properties:
+      Description: Subnets for ElastiCache
+      SubnetIds:
+        - !ImportValue {"Fn::Sub": "${NetworkStackName}-PrivateSubnet1"}
+# ---------- ELASTICACHE DEFINITIONS ---------         
+  ElastiCacheCluster:
+    DependsOn: 
+     - bookstoreCacheSubnets
+     - bookstoreCacheSecurityGroup
+    Type: 'AWS::ElastiCache::CacheCluster'
+    Properties:
+      ClusterName: !Join ["",[!ImportValue {"Fn::Sub": "${NetworkStackName}-ProjectName"}, "-cluster"]]
+      CacheNodeType: cache.t2.micro
+      NumCacheNodes: '1'
+      Engine: redis
+      CacheSubnetGroupName: !Ref bookstoreCacheSubnets
+      VpcSecurityGroupIds:
+        - Fn::GetAtt:
+          - bookstoreCacheSecurityGroup
+          - 'GroupId'
+Outputs:
+  RedisEndpoint:
+    Value: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
+    Export:
+      Name: !Sub ${AWS::StackName}-RedisEndpoint
+  RedisSecurityGroup:
+    Value: !Ref redisLambdaSecurityGroup
+    Export:
+      Name: !Sub ${AWS::StackName}-RedisSecurityGroup

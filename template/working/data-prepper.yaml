@@ -68,6 +68,7 @@ Resources:
   DataPrepperGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
+      HealthCheckGracePeriod: 60
       HealthCheckType: ELB
       LaunchConfigurationName: !Ref DataPrepperLaunchConfig
       MinSize: 1
