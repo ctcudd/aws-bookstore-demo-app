@@ -1,5 +1,11 @@
 "use strict";
-
+var AWS = require("aws-sdk");
+try {
+    var AWSXRay = require('aws-xray-sdk');
+    AWS = AWSXRay.captureAWS(require('aws-sdk'));
+} catch(e) {
+    console.error("XRay library not available");
+}
 const redis = require("redis");
 
 // GetBestSellers - Get a list of the top 20 best selling books

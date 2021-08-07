@@ -12,9 +12,14 @@ from gremlin_python.process.strategies import *
 from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
 
 import os
-import json
+try:
+    from aws_xray_sdk.core import xray_recorder
+    from aws_xray_sdk.core import patch_all
+    patch_all()
+except ImportError:
+    print('XRay library not available')
 
-myNeptuneEndpoint = "ws://" + os.environ["neptunedb"] + ":8182/gremlin" # Neptune cluster url
+myNeptuneEndpoint = "wss://" + os.environ["neptunedb"] + ":8182/gremlin" # Neptune cluster url
 
 # GetRecommendationsByBook - Get list of friends who have purchased this book and how many times it was purchased by those friends
 def handler(event, context):

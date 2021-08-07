@@ -1,6 +1,12 @@
 "use strict";
 
-const AWS = require("aws-sdk");
+var AWS = require("aws-sdk");
+try {
+  var AWSXRay = require('aws-xray-sdk');
+  AWS = AWSXRay.captureAWS(require('aws-sdk'));
+} catch(e) {
+    console.error("XRay library not available");
+}
 const dynamoDb = new AWS.DynamoDB.DocumentClient();
 
 // RemoveFromCart - Remove a particular book from a customer's cart

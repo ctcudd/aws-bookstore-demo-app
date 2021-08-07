@@ -12,9 +12,14 @@ from gremlin_python.process.strategies import *
 from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
 
 import os
-import json
+try:
+    from aws_xray_sdk.core import xray_recorder
+    from aws_xray_sdk.core import patch_all
+    patch_all()
+except ImportError:
+    print('XRay library not available')
 
-myNeptuneEndpoint = "ws://" + os.environ["neptunedb"] + ":8182/gremlin" # Neptune cluster URL
+myNeptuneEndpoint = "wss://" + os.environ["neptunedb"] + ":8182/gremlin" # Neptune cluster URL
 
 # GetRecommendations - Get list of recommended books based on the purchase history of a user's friends
 def handler(event, context):
@@ -24,7 +29,7 @@ def handler(event, context):
     g = graph.traversal().withRemote(DriverRemoteConnection(myNeptuneEndpoint,"g"))
     
     toReturn = g.V().hasLabel("book").where(inE("purchased").count().is_(P.gt(0))).project("bookId","purchases","friendsPurchased") \
-        .by(id()).by(inE("purchased").count()).by(in_().id().fold()).order().by(select("purchases"),Order.decr).limit(5).toList()
+        .by(id()).by(inE("purchased").count()).by(in_().id().fold()).order().by(select("purchases"),Order.desc).limit(5).toList()
     
     response = {
         "statusCode": 200,

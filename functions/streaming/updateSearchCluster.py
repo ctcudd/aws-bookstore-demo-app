@@ -1,7 +1,13 @@
 import boto3
 import os
-from botocore.vendored import requests
+import requests
 from requests_aws4auth import AWS4Auth
+try:
+    from aws_xray_sdk.core import xray_recorder
+    from aws_xray_sdk.core import patch_all
+    patch_all()
+except ImportError:
+    print('xray sdk not available')
 
 region = os.environ["REGION"]
 service = "es"
@@ -22,7 +28,7 @@ def handler(event, context):
     for record in event["Records"]:
         # Get the primary key for use as the Elasticsearch ID
         id = record["dynamodb"]["Keys"]["id"]["S"]
-        print "bookId " + id
+        print("bookId " + id)
 
         if record['eventName'] == 'REMOVE':
             r = requests.delete(url + id, auth=awsauth)

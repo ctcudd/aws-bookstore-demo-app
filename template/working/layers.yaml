@@ -20,7 +20,7 @@ Mappings:
       nodeXraySdk: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/aws-xray-sdk-nodejs.zip
       pythonXraySdk: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/aws-xray-sdk-python.zip
       pythonGremlin: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/gremlin_python.zip
-      nodeRedis: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/redis-node.zip
+      nodeRedis: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/node-redis.zip
 
 Resources:
 # ---------- LAMBDA LAYERS ---------

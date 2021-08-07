@@ -21,3 +21,38 @@ unframed_requests
 
 
 ssh -i teamservices.pem ec2-user@$(aws ec2 describe-instances --filters "Name=tag:Name,Values=trace-DataPrepperServers" --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
+
+ssh -i teamservices.pem ec2-user@$(aws ec2 describe-instances --filters "Name=tag:Name,Values=$PROJECT_NAME-DataPrepperServers" --query "Reservations[*].Instances[*].PublicIpAddress" --output text)
+
+ssh -i teamservices.pem -L \
+    9092:$(aws es describe-elasticsearch-domain --domain-name $PROJECT_NAME-domain --query "DomainStatus.Endpoints.vpc" --output text):443 -N \
+    ec2-user@$(aws ec2 describe-instances --filters "Name=tag:Name,Values=$PROJECT_NAME-DataPrepperServers" --query "Reservations[*].Instances[*].PublicIpAddress" --output text)
+
+
+
+export AWS_REGION=us-east-1
+export PROJECT_NAME=booka
+export DATA_PREPPER_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=$PROJECT_NAME-DataPrepperServers" --query "Reservations[*].Instances[*].PublicIpAddress" --output text)
+export ES_DOMAIN=$(aws es describe-elasticsearch-domain --domain-name $PROJECT_NAME-domain --query "DomainStatus.Endpoints.vpc" --output text)
+
+ssh -i teamservices.pem -L 9200:${ES_DOMAIN}:443 -N ec2-user@${DATA_PREPPER_IP}
+---
+
+Subsegments
+
+* missing by default?
+* python 
+    1. [Patching](https://docs.aws.amazon.com/xray/latest/devguide/xray-sdk-python-patching.html)
+
+        ```python
+        from aws_xray_sdk.core import xray_recorder
+        from aws_xray_sdk.core import patch_all
+        
+        patch_all()
+        ```
+    2. aiohttp?
+    
+ 
+        ```python
+        import aiohttp
+        ```       

@@ -4,6 +4,13 @@ import os
 import requests
 from requests_aws4auth import AWS4Auth
 
+try:
+    from aws_xray_sdk.core import xray_recorder
+    from aws_xray_sdk.core import patch_all
+    patch_all()
+except ImportError:
+    print('xray sdk not available')
+
 region = os.environ["REGION"]
 service = "es"
 credentials = boto3.Session().get_credentials()
@@ -26,7 +33,7 @@ def handler(event, context):
             }
         }
     }
-    print query
+    print(query)
 
     # ES 6.x requires an explicit Content-Type header
     headers = { "Content-Type": "application/json" }
@@ -44,6 +51,4 @@ def handler(event, context):
         "body": r.text
     }
 
-    # Add the search results to the response
-    print response
     return response
