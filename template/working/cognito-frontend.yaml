@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: 2010-09-09
 Parameters:
-  MainStackName:
+  FunctionStackName:
     Description: name of main stack
     Type: String
   LayerStackName:
@@ -46,7 +46,7 @@ Resources:
         - !GetAtt
           - UserPool
           - Arn
-      RestApiId: !ImportValue {"Fn::Sub": "${MainStackName}-AppApi"}
+      RestApiId: !ImportValue {"Fn::Sub": "${FunctionStackName}-AppApi"}
       Type: COGNITO_USER_POOLS
     Metadata:
       'AWS::CloudFormation::Designer':
@@ -55,7 +55,7 @@ Resources:
     Type: 'AWS::ApiGateway::Deployment'
     Properties:
       Description: Prod deployment for API
-      RestApiId: !ImportValue {"Fn::Sub": "${MainStackName}-AppApi"}
+      RestApiId: !ImportValue {"Fn::Sub": "${FunctionStackName}-AppApi"}
       StageName: prod
       StageDescription:
         DataTraceEnabled: true
@@ -192,7 +192,7 @@ Resources:
                     - ':'
                     - !Ref 'AWS::AccountId'
                     - ':'
-                    - !ImportValue {"Fn::Sub": "${MainStackName}-AppApi"}
+                    - !ImportValue {"Fn::Sub": "${FunctionStackName}-AppApi"}
                     - /*
   IdentityPoolRoleMapping:
     Type: 'AWS::Cognito::IdentityPoolRoleAttachment'
@@ -527,7 +527,7 @@ Resources:
       Timeout: 300
       Environment:
         Variables:
-          API_URL: { "Fn::Sub" : [ 'https://${AppApi}.execute-api.${AWS::Region}.amazonaws.com/prod', { AppApi: !ImportValue {"Fn::Sub": "${MainStackName}-AppApi"} } ] }
+          API_URL: { "Fn::Sub" : [ 'https://${AppApi}.execute-api.${AWS::Region}.amazonaws.com/prod', { AppApi: !ImportValue {"Fn::Sub": "${FunctionStackName}-AppApi"} } ] }
           BRANCH_NAME: master
           REGION: !Ref 'AWS::Region'
           REPOSITORY_NAME: !Sub '${ProjectName}-WebAssets'
@@ -678,6 +678,3 @@ Outputs:
     Value: !Sub
       - https://${Domain}
       - { Domain: !GetAtt AssetsCDN.DomainName }
-#  PortForwardCmd:
-#    Description: Cmd for tunneling into Kibana
-#    Value: !Sub "ssh -i /your/path/to/key.pem -L 9092:${ElasticsearchDomainEndpoint}:443 -N ec2-user@${DataPrepperInstance.PublicIp}"

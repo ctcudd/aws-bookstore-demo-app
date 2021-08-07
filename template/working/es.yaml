@@ -126,6 +126,10 @@ Resources:
       DependsOn: CreateESRoleFunction
 
 Outputs:
+  StackName:
+    Value: !Ref AWS::StackName
+    Export:
+      Name: !Sub ${AWS::StackName}-StackName
   Domain:
     Value: !Ref ElasticsearchDomain
     Export:

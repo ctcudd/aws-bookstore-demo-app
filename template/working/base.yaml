@@ -1,0 +1,84 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  ProjectName:
+    Description: Used as a prefix for project resources.  Can be up to 12 characters, lowercase letters (a-z) only.
+    Type: String
+    Default: mybookstore
+    AllowedPattern: "^[a-z]{1,12}"
+    ConstraintDescription: The ProjectName can be up to 12 characters, lowercase letters (a-z) only.
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: cannot be empty
+Resources:
+
+  network:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Sub https://s3-${AWS::Region}.amazonaws.com/ee-assets-prod-${AWS::Region}/modules/09f302bc1c3b49efa121cb0cc01302d3/v1/network.yaml
+      Parameters:
+        ProjectName: !Ref ProjectName
+
+  layers:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Sub https://s3-${AWS::Region}.amazonaws.com/ee-assets-prod-${AWS::Region}/modules/09f302bc1c3b49efa121cb0cc01302d3/v1/layers.yaml
+
+  elasticsearch:
+    DependsOn: [layers, network]
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Sub https://s3-${AWS::Region}.amazonaws.com/ee-assets-prod-${AWS::Region}/modules/09f302bc1c3b49efa121cb0cc01302d3/v1/es.yaml
+      Parameters:
+        NetworkStackName: !GetAtt network.Outputs.StackName
+
+  dataprepper:
+    DependsOn: [elasticsearch, network]
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Sub https://s3-${AWS::Region}.amazonaws.com/ee-assets-prod-${AWS::Region}/modules/09f302bc1c3b49efa121cb0cc01302d3/v1/data-prepper.yaml
+      Parameters:
+        NetworkStackName: !GetAtt network.Outputs.StackName
+        ElasticsearchStackName: !GetAtt elasticsearch.Outputs.StackName
+        DataPrepperKeyName: !Ref KeyName
+
+  redis:
+    DependsOn: [layers, network]
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Sub https://s3-${AWS::Region}.amazonaws.com/ee-assets-prod-${AWS::Region}/modules/09f302bc1c3b49efa121cb0cc01302d3/v1/redis.yaml
+      Parameters:
+        NetworkStackName: !GetAtt network.Outputs.StackName
+
+  neptune:
+    DependsOn: [layers, network]
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Sub https://s3-${AWS::Region}.amazonaws.com/ee-assets-prod-${AWS::Region}/modules/09f302bc1c3b49efa121cb0cc01302d3/v1/neptune.yaml
+      Parameters:
+        NetworkStackName: !GetAtt network.Outputs.StackName
+        LayerStackName: !GetAtt layers.Outputs.StackName
+
+  functions:
+    DependsOn: [dataprepper, elasticsearch, redis, neptune, layers, network]
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Sub https://s3-${AWS::Region}.amazonaws.com/ee-assets-prod-${AWS::Region}/modules/09f302bc1c3b49efa121cb0cc01302d3/v1/functions.yaml
+      Parameters:
+        NetworkStackName: !GetAtt network.Outputs.StackName
+        ProjectName: !GetAtt network.Outputs.ProjectName
+        ElasticsearchStackName: !GetAtt elasticsearch.Outputs.StackName
+        DataPrepperStackName: !GetAtt dataprepper.Outputs.StackName
+        NeptuneStackName: !GetAtt neptune.Outputs.StackName
+        LayerStackName: !GetAtt layers.Outputs.StackName
+        RedisStackName: !GetAtt redis.Outputs.StackName
+
+  frontend:
+    DependsOn: [functions]
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Sub https://s3-${AWS::Region}.amazonaws.com/ee-assets-prod-${AWS::Region}/modules/09f302bc1c3b49efa121cb0cc01302d3/v1/cognito-frontend.yaml
+      Parameters:
+        FunctionStackName: !GetAtt functions.Outputs.StackName
+        LayerStackName: !GetAtt layers.Outputs.StackName
+        ProjectName: !GetAtt network.Outputs.ProjectName

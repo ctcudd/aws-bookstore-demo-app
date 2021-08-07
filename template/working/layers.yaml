@@ -6,10 +6,13 @@ Mappings:
       ConfigBucket: ee-assets-prod-us-east-1
     us-west-2:
       Bucket: aws-bookstore-demo-us-west-2
+      ConfigBucket: ee-assets-prod-us-west-2
     eu-central-1:
       Bucket: aws-bookstore-demo-eu-central-1
+      ConfigBucket: ee-assets-prod-us-west-2
     eu-west-1:
       Bucket: aws-bookstore-demo-eu-west-1
+      ConfigBucket: ee-assets-prod-us-west-2
   Constants:
     S3Keys:
       CollectorConfigLayer: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/collector-config.zip
@@ -17,8 +20,25 @@ Mappings:
       nodeXraySdk: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/aws-xray-sdk-nodejs.zip
       pythonXraySdk: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/aws-xray-sdk-python.zip
       pythonGremlin: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/gremlin_python.zip
+      nodeRedis: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/redis-node.zip
+
 Resources:
 # ---------- LAMBDA LAYERS ---------
+  NodeRedisLayer:
+    Type: "AWS::Lambda::LayerVersion"
+    Properties:
+      CompatibleRuntimes:
+        - nodejs12.x
+        - nodejs14.x
+      Content:
+        S3Bucket: !FindInMap
+          - S3Buckets
+          - !Ref 'AWS::Region'
+          - ConfigBucket
+        S3Key: !FindInMap
+          - Constants
+          - S3Keys
+          - nodeRedis
   PythonGremlinLayer:
     Type: "AWS::Lambda::LayerVersion"
     Properties:
@@ -90,6 +110,7 @@ Resources:
     Type: "AWS::Lambda::LayerVersion"
     Properties:
       CompatibleRuntimes:
+        - python3.8
         - python3.7
         - python3.6
       Content:
@@ -103,6 +124,10 @@ Resources:
           - PythonLambdaLayer 
 
 Outputs:
+  StackName:
+    Value: !Ref AWS::StackName
+    Export:
+      Name: !Sub ${AWS::StackName}-StackName
   CollectorConfigLayer:
     Value: !Ref CollectorConfigLayer
     Export:
@@ -123,3 +148,7 @@ Outputs:
     Value: !Ref PythonGremlinLayer
     Export:
       Name: !Sub ${AWS::StackName}-PythonGremlinLayer
+  NodeRedisLayer:
+    Value: !Ref NodeRedisLayer
+    Export:
+      Name: !Sub ${AWS::StackName}-NodeRedisLayer

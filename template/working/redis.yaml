@@ -47,6 +47,10 @@ Resources:
           - bookstoreCacheSecurityGroup
           - 'GroupId'
 Outputs:
+  StackName:
+    Value: !Ref AWS::StackName
+    Export:
+      Name: !Sub ${AWS::StackName}-StackName
   RedisEndpoint:
     Value: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
     Export:

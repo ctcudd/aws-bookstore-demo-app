@@ -359,6 +359,10 @@ Resources:
         Version: '2012-10-17'
       Path: /
 Outputs:
+  StackName:
+    Value: !Ref AWS::StackName
+    Export:
+      Name: !Sub ${AWS::StackName}-StackName
   NeptuneSecurityGroup:
     Value: !Ref bookstoreNeptuneSecurityGroup
     Export:

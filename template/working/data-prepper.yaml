@@ -230,6 +230,10 @@ Resources:
         Timeout: "PT15M"
 
 Outputs:
+  StackName:
+    Value: !Ref AWS::StackName
+    Export:
+      Name: !Sub ${AWS::StackName}-StackName
   PublicDNS:
     Export:
       Name: !Sub ${AWS::StackName}-PublicDNS
