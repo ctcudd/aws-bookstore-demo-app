@@ -15,12 +15,12 @@ Mappings:
       ConfigBucket: ee-assets-prod-us-west-2
   Constants:
     S3Keys:
-      CollectorConfigLayer: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/collector-config.zip
+      CollectorConfigLayer: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/layers/collector-config.zip
       PythonLambdaLayer: functions/PythonLambdaLayer.zip
-      nodeXraySdk: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/aws-xray-sdk-nodejs.zip
-      pythonXraySdk: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/aws-xray-sdk-python.zip
-      pythonGremlin: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/gremlin_python.zip
-      nodeRedis: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/node-redis.zip
+      nodeXraySdk: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/layers/node-aws-xray-sdk.zip
+      pythonXraySdk: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/layers/python-aws-xray-sdk.zip
+      pythonGremlin: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/layers/python-gremlinpython.zip
+      nodeRedis: modules/09f302bc1c3b49efa121cb0cc01302d3/v1/layers/node-redis.zip
 
 Resources:
 # ---------- LAMBDA LAYERS ---------

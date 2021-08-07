@@ -30,8 +30,6 @@ for d in node-redis node-aws-xray-sdk python-aws-xray-sdk python-gremlinpython c
   createLayerZip ${d}
 done
 
-exit
-
 for f in *.zip; do
   aws s3 cp "${f}" "s3://${BUCKET_PATH}/layers/${f}"
 done

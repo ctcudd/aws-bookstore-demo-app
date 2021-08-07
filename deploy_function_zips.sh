@@ -2,7 +2,7 @@
 BUCKET_PATH="ee-assets-prod-us-east-1/modules/09f302bc1c3b49efa121cb0cc01302d3/v1"
 
 
-function createFunctionLayerZip(){
+function createFunctionZip(){
   local path=${1}
   local ext=${path: -3}
   local target="index${ext}"
@@ -26,9 +26,8 @@ mkdir -p build/temp
 
 pushd build
 for f in ../functions/*/{*.js,*.py}; do
-  createFunctionLayerZip "${f}";
+  createFunctionZip "${f}";
 done;
-exit
 rm -rf temp
 
 for f in *.zip; do

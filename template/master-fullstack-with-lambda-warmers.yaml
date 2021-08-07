@@ -476,7 +476,7 @@ Metadata:
         - a6392891-b014-4ea9-93a2-831f602268aa
         - 97efc723-a637-41c7-b712-3af9363a1702
         - acebdfda-9b64-45f8-a888-3d1251bba41a
-        - 0e6ce8f6-0271-439e-afcf-4e4d23c1edc3     
+        - 0e6ce8f6-0271-439e-afcf-4e4d23c1edc3
 Parameters:
   ProjectName:
     Description: Name of the project (lowercase and under ten characters)
@@ -538,13 +538,13 @@ Mappings:
       UpdateConfigCode: functions/UpdateConfig.zip
       SeederFunctionCode: aws-serverless-codecommit-seeder.zip
 Resources:
-# ---------- VPC - SUBNET - SECURITY GROUPS  ---------
+  # ---------- VPC - SUBNET - SECURITY GROUPS  ---------
 
   bookstoreVPC:
     Type: "AWS::EC2::VPC"
     Properties:
       CidrBlock: '172.31.0.0/16'
-  
+
   bookstoreSubnet1:
     Type: "AWS::EC2::Subnet"
     Properties:
@@ -552,9 +552,9 @@ Resources:
         Fn::Select:
           - 0
           - Fn::Cidr:
-            - Fn::GetAtt: [bookstoreVPC, CidrBlock]
-            - 3
-            - 8
+              - Fn::GetAtt: [bookstoreVPC, CidrBlock]
+              - 3
+              - 8
       VpcId:
         Ref: bookstoreVPC
       AvailabilityZone:
@@ -570,16 +570,16 @@ Resources:
         Fn::Select:
           - 1
           - Fn::Cidr:
-            - Fn::GetAtt: [bookstoreVPC, CidrBlock]
-            - 3
-            - 8
+              - Fn::GetAtt: [bookstoreVPC, CidrBlock]
+              - 3
+              - 8
       VpcId:
         Ref: bookstoreVPC
       AvailabilityZone:
         Fn::Select:
           - 1
           - Fn::GetAZs:
-              Ref: "AWS::Region"  
+              Ref: "AWS::Region"
 
   bookstoreSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
@@ -588,23 +588,23 @@ Resources:
       GroupDescription: Lock cache down to webserver access only
       VpcId: !Ref bookstoreVPC
 
-  bookstoreVPCRouteTable:  
+  bookstoreVPCRouteTable:
     Type: AWS::EC2::RouteTable
-    Properties: 
+    Properties:
       VpcId: !Ref bookstoreVPC
-  
+
   bookstoreVPCRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties: 
+    Properties:
       RouteTableId: !Ref bookstoreVPCRouteTable
       SubnetId: !Ref bookstoreSubnet1
 
   bookstoreVPCRouteTableAssociationTwo:
     Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties: 
+    Properties:
       RouteTableId: !Ref bookstoreVPCRouteTable
-      SubnetId: !Ref bookstoreSubnet2    
-    
+      SubnetId: !Ref bookstoreSubnet2
+
   bookstoreNeptuneSecurityGroup:
     Type: "AWS::EC2::SecurityGroup"
     Properties:
@@ -631,7 +631,7 @@ Resources:
     Properties:
       VpcId:
         Ref: bookstoreVPC
-      GroupDescription: "A component security group allowing access only to redis"  
+      GroupDescription: "A component security group allowing access only to redis"
 
   bookstoreCacheSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
@@ -651,8 +651,8 @@ Resources:
     Properties:
       Description: Subnets for ElastiCache
       SubnetIds:
-        - Ref: bookstoreSubnet1        
-  
+        - Ref: bookstoreSubnet1
+
   # ---------- NEPTUNE CLUSTER DEFINITION ---------
 
   bookstoreNeptuneCluster:
@@ -668,39 +668,39 @@ Resources:
       DBClusterIdentifier: !Ref bookstoreNeptuneCluster
       DBInstanceClass: "db.r4.large"
 
-# ---------- IAM ROLE ATTACH FOR S3 BULK LOAD ------------
+  # ---------- IAM ROLE ATTACH FOR S3 BULK LOAD ------------
 
   bookstoreNeptuneLoaderS3ReadPolicy:
     Type: AWS::IAM::Policy
     Properties:
       PolicyDocument:
         Statement:
-        - Action:
-          - s3:Get*
-          - s3:List*
-          Effect: Allow
-          Resource: "*"
+          - Action:
+              - s3:Get*
+              - s3:List*
+            Effect: Allow
+            Resource: "*"
         Version: '2012-10-17'
       PolicyName: bookstoreNeptuneLoaderS3ReadPolicy
       Roles:
-      - Ref: bookstoreNeptuneLoaderS3ReadRole
+        - Ref: bookstoreNeptuneLoaderS3ReadRole
   bookstoreNeptuneLoaderS3ReadRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
         Statement:
-        - Action: sts:AssumeRole
-          Effect: Allow
-          Principal:
-            Service:
-            - rds.amazonaws.com
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - rds.amazonaws.com
         Version: '2012-10-17'
       Path: /
 
   # ---------- CUSTOM CLOUDFORMATION RESOURCE FOR ATTACHING S3 READ ROLE TO NEPTUNE CLUSTER ---------
 
   bookstoreNeptuneIAMAttach:
-    DependsOn: 
+    DependsOn:
       - bookstoreNeptuneIAMAttachLambdaRoleCloudWatchStream
       - bookstoreNeptuneIAMAttachLambdaRoleCloudWatchGroup
       - bookstoreNeptuneIAMAttachLambdaRoleEC2
@@ -710,11 +710,11 @@ Resources:
       - bookstoreNeptuneLoaderS3ReadPolicy
       - bookstoreNeptuneLoaderS3ReadRole
     Type: Custom::NeptuneIAMAttach
-    Properties: 
+    Properties:
       ServiceToken:
         Fn::GetAtt: [ bookstoreNeptuneIAMAttachLambda, Arn ]
       NeptuneDB: !Ref bookstoreNeptuneCluster
-      IAMRole: 
+      IAMRole:
         Fn::GetAtt: [ bookstoreNeptuneLoaderS3ReadRole, Arn ]
       Region: !Ref 'AWS::Region'
   bookstoreNeptuneIAMAttachLambdaRoleCloudWatchStream:
@@ -722,58 +722,58 @@ Resources:
     Properties:
       PolicyDocument:
         Statement:
-        - Action:
-          - logs:CreateLogStream
-          - logs:PutLogEvents
-          Effect: Allow
-          Resource: !Join [ "", [ "arn:aws:logs:", !Ref "AWS::Region", ":", !Ref "AWS::AccountId" , ":log-group:/aws/lambda/",  !Ref bookstoreNeptuneIAMAttachLambda, ":*" ]]
+          - Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Effect: Allow
+            Resource: !Join [ "", [ "arn:aws:logs:", !Ref "AWS::Region", ":", !Ref "AWS::AccountId" , ":log-group:/aws/lambda/",  !Ref bookstoreNeptuneIAMAttachLambda, ":*" ]]
         Version: '2012-10-17'
       PolicyName: bookstoreNeptuneIAMAttachLambdaRoleCloudWatchStream
       Roles:
-      - Ref: bookstoreNeptuneIAMAttachLambdaRole
+        - Ref: bookstoreNeptuneIAMAttachLambdaRole
   bookstoreNeptuneIAMAttachLambdaRoleCloudWatchGroup:
     Type: AWS::IAM::Policy
     Properties:
       PolicyDocument:
         Statement:
-        - Action:
-          - logs:CreateLogGroup
-          Effect: Allow
-          Resource: !Join [ "", [ "arn:aws:logs:", !Ref "AWS::Region", ":", !Ref "AWS::AccountId" , ":*" ]]
+          - Action:
+              - logs:CreateLogGroup
+            Effect: Allow
+            Resource: !Join [ "", [ "arn:aws:logs:", !Ref "AWS::Region", ":", !Ref "AWS::AccountId" , ":*" ]]
         Version: '2012-10-17'
       PolicyName: bookstoreNeptuneIAMAttachLambdaRoleCloudWatchGroup
       Roles:
-      - Ref: bookstoreNeptuneIAMAttachLambdaRole
+        - Ref: bookstoreNeptuneIAMAttachLambdaRole
   bookstoreNeptuneIAMAttachLambdaRoleEC2:
     Type: AWS::IAM::Policy
     Properties:
       PolicyDocument:
         Statement:
-        - Action:
-          - ec2:CreateNetworkInterface
-          - ec2:DescribeNetworkInterfaces
-          - ec2:DeleteNetworkInterface
-          - ec2:DetachNetworkInterface
-          Effect: Allow
-          Resource: "*"
+          - Action:
+              - ec2:CreateNetworkInterface
+              - ec2:DescribeNetworkInterfaces
+              - ec2:DeleteNetworkInterface
+              - ec2:DetachNetworkInterface
+            Effect: Allow
+            Resource: "*"
         Version: '2012-10-17'
       PolicyName: bookstoreNeptuneIAMAttachLambdaRoleEC2
       Roles:
-      - Ref: bookstoreNeptuneIAMAttachLambdaRole
+        - Ref: bookstoreNeptuneIAMAttachLambdaRole
   bookstoreNeptuneIAMAttachLambdaRoleRDS:
     DependsOn: bookstoreNeptuneDB
     Type: AWS::IAM::Policy
     Properties:
       PolicyDocument:
         Statement:
-          - 
+          -
             Action:
               - rds:AddRoleToDBCluster
               - rds:DescribeDBClusters
             Effect: Allow
             Resource:
               - "*"
-          - 
+          -
             Action:
               - iam:PassRole
             Effect: Allow
@@ -782,17 +782,17 @@ Resources:
         Version: '2012-10-17'
       PolicyName: bookstoreNeptuneIAMAttachLambdaRoleRDS
       Roles:
-      - Ref: bookstoreNeptuneIAMAttachLambdaRole
+        - Ref: bookstoreNeptuneIAMAttachLambdaRole
   bookstoreNeptuneIAMAttachLambdaRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
         Statement:
-        - Action: sts:AssumeRole
-          Effect: Allow
-          Principal:
-            Service:
-            - lambda.amazonaws.com
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
         Version: '2012-10-17'
       Path: /
   bookstoreNeptuneIAMAttachLambda:
@@ -800,14 +800,14 @@ Resources:
     DependsOn: bookstoreNeptuneDB
     Properties:
       Code:
-        S3Bucket: !FindInMap 
-                    - S3Buckets
-                    - !Ref 'AWS::Region'
-                    - Bucket
-        S3Key: !FindInMap 
-                 - Constants
-                 - S3Keys
-                 - NeptuneIAMCode
+        S3Bucket: !FindInMap
+          - S3Buckets
+          - !Ref 'AWS::Region'
+          - Bucket
+        S3Key: !FindInMap
+          - Constants
+          - S3Keys
+          - NeptuneIAMCode
       Description: 'Lambda function to add an IAM policy to a Neptune cluster to allow for bulk load.'
       Handler: lambda_function.lambda_handler
       MemorySize: 128
@@ -817,7 +817,7 @@ Resources:
       Timeout: 30
 
 
-# ---------- VPC ENDPOINT FOR NEPTUNE BULK LOADER ACCESS TO S3 ---------
+  # ---------- VPC ENDPOINT FOR NEPTUNE BULK LOADER ACCESS TO S3 ---------
 
   S3Endpoint:
     Type: AWS::EC2::VPCEndpoint
@@ -838,19 +838,19 @@ Resources:
       ServiceName: !Join [ "" , [ "com.amazonaws.", !Ref "AWS::Region", ".s3"]]
       VpcId: !Ref bookstoreVPC
 
-# ---------- CUSTOM RESOURCE TO INITIATE NEPTUNE BULK LOAD PROCESS ---------
-  bookstoreNeptuneLoader: 
+  # ---------- CUSTOM RESOURCE TO INITIATE NEPTUNE BULK LOAD PROCESS ---------
+  bookstoreNeptuneLoader:
     DependsOn:
       - bookstoreNeptuneLoaderLambdaRoleCloudWatchStream
       - bookstoreNeptuneLoaderLambdaRoleCloudWatchGroup
       - bookstoreNeptuneLoaderLambdaRoleEC2
-      - bookstoreNeptuneLoaderLambdaRole      
+      - bookstoreNeptuneLoaderLambdaRole
       - bookstoreNeptuneLoaderLambda
       - bookstoreNeptuneLoaderS3ReadPolicy
       - bookstoreNeptuneLoaderS3ReadRole
       - S3Endpoint
     Type: "Custom::NeptuneLoader"
-    Properties: 
+    Properties:
       ServiceToken:
         Fn::GetAtt: [ bookstoreNeptuneLoaderLambda, Arn]
 
@@ -859,76 +859,76 @@ Resources:
     Properties:
       PolicyDocument:
         Statement:
-        - Action:
-          - logs:CreateLogStream
-          - logs:PutLogEvents
-          Effect: Allow
-          Resource: !Join [ "", [ "arn:aws:logs:", !Ref "AWS::Region", ":", !Ref "AWS::AccountId" , ":log-group:/aws/lambda/",  !Ref bookstoreNeptuneLoaderLambda, ":*" ]]
+          - Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Effect: Allow
+            Resource: !Join [ "", [ "arn:aws:logs:", !Ref "AWS::Region", ":", !Ref "AWS::AccountId" , ":log-group:/aws/lambda/",  !Ref bookstoreNeptuneLoaderLambda, ":*" ]]
         Version: '2012-10-17'
       PolicyName: bookstoreNeptuneLoaderLambdaRoleCloudWatchStream
       Roles:
-      - Ref: bookstoreNeptuneLoaderLambdaRole
+        - Ref: bookstoreNeptuneLoaderLambdaRole
   bookstoreNeptuneLoaderLambdaRoleCloudWatchGroup:
     Type: AWS::IAM::Policy
     Properties:
       PolicyDocument:
         Statement:
-        - Action:
-          - logs:CreateLogGroup
-          Effect: Allow
-          Resource: !Join [ "", [ "arn:aws:logs:", !Ref "AWS::Region", ":", !Ref "AWS::AccountId" , ":*" ]]
+          - Action:
+              - logs:CreateLogGroup
+            Effect: Allow
+            Resource: !Join [ "", [ "arn:aws:logs:", !Ref "AWS::Region", ":", !Ref "AWS::AccountId" , ":*" ]]
         Version: '2012-10-17'
       PolicyName: bookstoreNeptuneLoaderLambdaRoleCloudWatchGroup
       Roles:
-      - Ref: bookstoreNeptuneLoaderLambdaRole
+        - Ref: bookstoreNeptuneLoaderLambdaRole
   bookstoreNeptuneLoaderLambdaRoleEC2:
     Type: AWS::IAM::Policy
     Properties:
       PolicyDocument:
         Statement:
-        - Action:
-          - ec2:CreateNetworkInterface
-          - ec2:DescribeNetworkInterfaces
-          - ec2:DeleteNetworkInterface
-          - ec2:DetachNetworkInterface          
-          Effect: Allow
-          Resource: "*"
+          - Action:
+              - ec2:CreateNetworkInterface
+              - ec2:DescribeNetworkInterfaces
+              - ec2:DeleteNetworkInterface
+              - ec2:DetachNetworkInterface
+            Effect: Allow
+            Resource: "*"
         Version: '2012-10-17'
       PolicyName: bookstoreNeptuneLoaderLambdaRoleEC2
       Roles:
-      - Ref: bookstoreNeptuneLoaderLambdaRole
+        - Ref: bookstoreNeptuneLoaderLambdaRole
   bookstoreNeptuneLoaderLambda:
     Type: AWS::Lambda::Function
     DependsOn: bookstoreNeptuneDB
     Properties:
       Code:
-        S3Bucket: !FindInMap 
-                    - S3Buckets
-                    - !Ref 'AWS::Region'
-                    - Bucket
-        S3Key: !FindInMap 
-                 - Constants
-                 - S3Keys
-                 - NeptuneLoaderCode
+        S3Bucket: !FindInMap
+          - S3Buckets
+          - !Ref 'AWS::Region'
+          - Bucket
+        S3Key: !FindInMap
+          - Constants
+          - S3Keys
+          - NeptuneLoaderCode
       Description: 'Lambda function to load data into Neptune instance.'
       Environment:
         Variables:
           neptunedb:
-            Fn::GetAtt: [ bookstoreNeptuneCluster, Endpoint ] 
-          neptuneloads3path: !Join 
-                              - ''
-                              - - 's3://'
-                                - !FindInMap 
-                                  - S3Buckets
-                                  - !Ref 'AWS::Region'
-                                  - NeptuneDataBucket
-                                - !FindInMap 
-                                  - Constants
-                                  - S3Keys
-                                  - bookstoreNeptuneS3DataPath              
-          region: 
+            Fn::GetAtt: [ bookstoreNeptuneCluster, Endpoint ]
+          neptuneloads3path: !Join
+            - ''
+            - - 's3://'
+              - !FindInMap
+                - S3Buckets
+                - !Ref 'AWS::Region'
+                - NeptuneDataBucket
+              - !FindInMap
+                - Constants
+                - S3Keys
+                - bookstoreNeptuneS3DataPath
+          region:
             Ref: "AWS::Region"
-          s3loadiamrole: 
+          s3loadiamrole:
             Fn::GetAtt: [ bookstoreNeptuneLoaderS3ReadRole, Arn]
       Handler: lambda_function.lambda_handler
       MemorySize: 128
@@ -950,15 +950,15 @@ Resources:
         - 'arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess'
       AssumeRolePolicyDocument:
         Statement:
-        - Action: sts:AssumeRole
-          Effect: Allow
-          Principal:
-            Service:
-            - lambda.amazonaws.com
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
         Version: '2012-10-17'
       Path: /
 
-# ---------- ROLES FOR DYNAMODB ---------
+  # ---------- ROLES FOR DYNAMODB ---------
   DynamoDbRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -991,18 +991,18 @@ Resources:
                   - 'dynamodb:Scan'
                   - 'dynamodb:DeleteItem'
                 Resource:
-                  - !GetAtt 
+                  - !GetAtt
                     - TBooks
                     - Arn
-                  - !GetAtt 
+                  - !GetAtt
                     - TOrders
                     - Arn
-                  - !GetAtt 
+                  - !GetAtt
                     - TCart
                     - Arn
-                  - !Join 
+                  - !Join
                     - ''
-                    - - !GetAtt 
+                    - - !GetAtt
                         - TBooks
                         - Arn
                       - /*
@@ -1010,7 +1010,7 @@ Resources:
       'AWS::CloudFormation::Designer':
         id: 07b29683-0ea5-44bf-a439-fcb89713fd09
 
-# ---------- ROLES FOR NEPTUNE ---------        
+  # ---------- ROLES FOR NEPTUNE ---------
   RecommendationsLambdaRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -1039,7 +1039,7 @@ Resources:
                 Resource: '*'
             Version: 2012-10-17
 
-# ---------- DYNAMODB TABLES DEFINITIONS ---------
+  # ---------- DYNAMODB TABLES DEFINITIONS ---------
   TBooks:
     Type: 'AWS::DynamoDB::Table'
     Properties:
@@ -1088,7 +1088,7 @@ Resources:
         ReadCapacityUnits: 1
         WriteCapacityUnits: 1
       StreamSpecification:
-        StreamViewType: NEW_AND_OLD_IMAGES  
+        StreamViewType: NEW_AND_OLD_IMAGES
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 57fb3162-6a2d-4651-a9c8-7404e82181e8
@@ -1112,7 +1112,7 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: e1a45038-ec76-464d-91b5-6b31bc325fa7
-# ---------- ELASTICSEARCH ROLES DEFINITIONS ---------        
+  # ---------- ELASTICSEARCH ROLES DEFINITIONS ---------
   ESSearchRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -1139,7 +1139,7 @@ Resources:
                 Action:
                   - 'es:ESHttpPost'
                   - 'es:ESHttpGet'
-                Resource: !Join 
+                Resource: !Join
                   - ''
                   - - 'arn:aws:es:'
                     - !Ref 'AWS::Region'
@@ -1153,10 +1153,10 @@ Resources:
                 Action:
                   - 's3:ListBucket'
                   - 's3:GetObject'
-                Resource: !Join 
+                Resource: !Join
                   - ''
                   - - 'arn:aws:s3:::'
-                    - !FindInMap 
+                    - !FindInMap
                       - S3Buckets
                       - !Ref 'AWS::Region'
                       - Bucket
@@ -1168,12 +1168,12 @@ Resources:
                   - 'dynamodb:GetShardIterator'
                   - 'dynamodb:ListStreams'
                 Resource:
-                  - !GetAtt 
+                  - !GetAtt
                     - TBooks
                     - Arn
-                  - !Join 
+                  - !Join
                     - ''
-                    - - !GetAtt 
+                    - - !GetAtt
                         - TBooks
                         - Arn
                       - /stream/*
@@ -1205,7 +1205,7 @@ Resources:
               AWS: '*'
             Action:
               - 'es:*'
-            Resource: !Join 
+            Resource: !Join
               - ''
               - - 'arn:aws:es:'
                 - !Ref 'AWS::Region'
@@ -1218,7 +1218,7 @@ Resources:
       AdvancedOptions:
         rest.action.multi.allow_explicit_index: true
 
-# ---------- ROLES FOR ELASTICACHE ---------  
+  # ---------- ROLES FOR ELASTICACHE ---------
   RedisRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -1238,11 +1238,11 @@ Resources:
         - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
         - 'arn:aws:iam::aws:policy/AWSLambdaInvocation-DynamoDB'
 
-# ---------- ELASTICACHE DEFINITIONS ---------         
+  # ---------- ELASTICACHE DEFINITIONS ---------
   ElastiCacheCluster:
-    DependsOn: 
-     - bookstoreCacheSubnets
-     - bookstoreCacheSecurityGroup
+    DependsOn:
+      - bookstoreCacheSubnets
+      - bookstoreCacheSecurityGroup
     Type: 'AWS::ElastiCache::CacheCluster'
     Properties:
       ClusterName: !Sub '${ProjectName}-cluster'
@@ -1252,10 +1252,10 @@ Resources:
       CacheSubnetGroupName: !Ref bookstoreCacheSubnets
       VpcSecurityGroupIds:
         - Fn::GetAtt:
-          - bookstoreCacheSecurityGroup
-          - 'GroupId'
-        
-# ---------- LAMBDA STREAMING FUNCTIONS ---------      
+            - bookstoreCacheSecurityGroup
+            - 'GroupId'
+
+  # ---------- LAMBDA STREAMING FUNCTIONS ---------
   UpdateSearchCluster:
     Type: 'AWS::Lambda::Function'
     DependsOn:
@@ -1266,7 +1266,7 @@ Resources:
       FunctionName: !Sub '${ProjectName}-UpdateSearchCluster'
       Description: 'Update Elasticsearch cluster as books are added'
       Handler: index.handler
-      Role: !GetAtt 
+      Role: !GetAtt
         - ESSearchRole
         - Arn
       Runtime: python2.7
@@ -1277,17 +1277,17 @@ Resources:
         SubnetIds:
           - Ref: bookstoreSubnet1
       Code:
-        S3Bucket: !FindInMap 
+        S3Bucket: !FindInMap
           - S3Buckets
           - !Ref 'AWS::Region'
           - Bucket
-        S3Key: !FindInMap 
+        S3Key: !FindInMap
           - Constants
           - S3Keys
           - UpdateSearchCode
       Environment:
         Variables:
-          ESENDPOINT: !GetAtt 
+          ESENDPOINT: !GetAtt
             - ElasticsearchDomain
             - DomainEndpoint
           REGION: !Ref 'AWS::Region'
@@ -1301,42 +1301,42 @@ Resources:
       FunctionName: !Sub '${ProjectName}-UpdateBestSellers'
       Description: 'Updates BestSellers as orders are placed'
       Handler: index.handler
-      Role: !GetAtt 
+      Role: !GetAtt
         - RedisRole
         - Arn
-      Runtime: nodejs10.x
+      Runtime: nodejs8.10
       Timeout: '60'
       VpcConfig:
         SecurityGroupIds:
           - Ref: redisLambdaSecurityGroup
-        SubnetIds: 
+        SubnetIds:
           - Ref: bookstoreSubnet1
       Code:
-        S3Bucket: !FindInMap 
+        S3Bucket: !FindInMap
           - S3Buckets
           - !Ref 'AWS::Region'
           - Bucket
-        S3Key: !FindInMap 
+        S3Key: !FindInMap
           - Constants
           - S3Keys
           - UpdateBestSellersCode
       Environment:
         Variables:
-          URL: !GetAtt 
+          URL: !GetAtt
             - ElastiCacheCluster
-            - RedisEndpoint.Address 
+            - RedisEndpoint.Address
 
- # ----------  STREAMING TRIGGERS ---------                     
+  # ----------  STREAMING TRIGGERS ---------
   DataTableStream:
     DependsOn: TBooks
     Type: 'AWS::Lambda::EventSourceMapping'
     Properties:
       BatchSize: 1
       Enabled: true
-      EventSourceArn: !GetAtt 
+      EventSourceArn: !GetAtt
         - TBooks
         - StreamArn
-      FunctionName: !GetAtt 
+      FunctionName: !GetAtt
         - UpdateSearchCluster
         - Arn
       StartingPosition: TRIM_HORIZON
@@ -1346,15 +1346,15 @@ Resources:
     Properties:
       BatchSize: 1
       Enabled: true
-      EventSourceArn: !GetAtt 
+      EventSourceArn: !GetAtt
         - TOrders
         - StreamArn
-      FunctionName: !GetAtt 
+      FunctionName: !GetAtt
         - FunctionUpdateBestSellers
         - Arn
-      StartingPosition: TRIM_HORIZON   
+      StartingPosition: TRIM_HORIZON
 
-# ---------- LAMBDA for DYNAMODB FUNCTIONS ---------         
+  # ---------- LAMBDA for DYNAMODB FUNCTIONS ---------
   FunctionListOrders:
     Type: 'AWS::Lambda::Function'
     Properties:
@@ -1362,8 +1362,8 @@ Resources:
       Description: Get list of books ordered by customerId
       Handler: index.handler
       MemorySize: 256
-      Runtime: nodejs10.x
-      Role: !GetAtt 
+      Runtime: nodejs8.10
+      Role: !GetAtt
         - DynamoDbRole
         - Arn
       Timeout: 120
@@ -1371,11 +1371,11 @@ Resources:
         Variables:
           TABLE_NAME: !Sub '${ProjectName}-Orders'
       Code:
-        S3Bucket: !FindInMap 
+        S3Bucket: !FindInMap
           - S3Buckets
           - !Ref 'AWS::Region'
           - Bucket
-        S3Key: !FindInMap 
+        S3Key: !FindInMap
           - Constants
           - S3Keys
           - ListOrdersCode
@@ -1389,8 +1389,8 @@ Resources:
       Description: Get book by id
       Handler: index.handler
       MemorySize: 256
-      Runtime: nodejs10.x
-      Role: !GetAtt 
+      Runtime: nodejs8.10
+      Role: !GetAtt
         - DynamoDbRole
         - Arn
       Timeout: 120
@@ -1398,11 +1398,11 @@ Resources:
         Variables:
           TABLE_NAME: !Sub '${ProjectName}-Books'
       Code:
-        S3Bucket: !FindInMap 
+        S3Bucket: !FindInMap
           - S3Buckets
           - !Ref 'AWS::Region'
           - Bucket
-        S3Key: !FindInMap 
+        S3Key: !FindInMap
           - Constants
           - S3Keys
           - GetBookCode
@@ -1416,8 +1416,8 @@ Resources:
       Description: Get list of books by category
       Handler: index.handler
       MemorySize: 256
-      Runtime: nodejs10.x
-      Role: !GetAtt 
+      Runtime: nodejs8.10
+      Role: !GetAtt
         - DynamoDbRole
         - Arn
       Timeout: 120
@@ -1425,11 +1425,11 @@ Resources:
         Variables:
           TABLE_NAME: !Sub '${ProjectName}-Books'
       Code:
-        S3Bucket: !FindInMap 
+        S3Bucket: !FindInMap
           - S3Buckets
           - !Ref 'AWS::Region'
           - Bucket
-        S3Key: !FindInMap 
+        S3Key: !FindInMap
           - Constants
           - S3Keys
           - ListBooksCode
@@ -1443,8 +1443,8 @@ Resources:
       Description: Update Customer's cart
       Handler: index.handler
       MemorySize: 256
-      Runtime: nodejs10.x
-      Role: !GetAtt 
+      Runtime: nodejs8.10
+      Role: !GetAtt
         - DynamoDbRole
         - Arn
       Timeout: 120
@@ -1452,11 +1452,11 @@ Resources:
         Variables:
           TABLE_NAME: !Sub '${ProjectName}-Cart'
       Code:
-        S3Bucket: !FindInMap 
+        S3Bucket: !FindInMap
           - S3Buckets
           - !Ref 'AWS::Region'
           - Bucket
-        S3Key: !FindInMap 
+        S3Key: !FindInMap
           - Constants
           - S3Keys
           - UpdateCartCode
@@ -1470,8 +1470,8 @@ Resources:
       Description: Get item in cart by customer and book id
       Handler: index.handler
       MemorySize: 256
-      Runtime: nodejs10.x
-      Role: !GetAtt 
+      Runtime: nodejs8.10
+      Role: !GetAtt
         - DynamoDbRole
         - Arn
       Timeout: 120
@@ -1479,11 +1479,11 @@ Resources:
         Variables:
           TABLE_NAME: !Sub '${ProjectName}-Cart'
       Code:
-        S3Bucket: !FindInMap 
+        S3Bucket: !FindInMap
           - S3Buckets
           - !Ref 'AWS::Region'
           - Bucket
-        S3Key: !FindInMap 
+        S3Key: !FindInMap
           - Constants
           - S3Keys
           - GetCartItemCode
@@ -1497,8 +1497,8 @@ Resources:
       Description: Get list of items in cart
       Handler: index.handler
       MemorySize: 256
-      Runtime: nodejs10.x
-      Role: !GetAtt 
+      Runtime: nodejs8.10
+      Role: !GetAtt
         - DynamoDbRole
         - Arn
       Timeout: 120
@@ -1506,11 +1506,11 @@ Resources:
         Variables:
           TABLE_NAME: !Sub '${ProjectName}-Cart'
       Code:
-        S3Bucket: !FindInMap 
+        S3Bucket: !FindInMap
           - S3Buckets
           - !Ref 'AWS::Region'
           - Bucket
-        S3Key: !FindInMap 
+        S3Key: !FindInMap
           - Constants
           - S3Keys
           - ListItemsInCartCode
@@ -1524,8 +1524,8 @@ Resources:
       Description: Add a book to cart
       Handler: index.handler
       MemorySize: 256
-      Runtime: nodejs10.x
-      Role: !GetAtt 
+      Runtime: nodejs8.10
+      Role: !GetAtt
         - DynamoDbRole
         - Arn
       Timeout: 120
@@ -1533,11 +1533,11 @@ Resources:
         Variables:
           TABLE_NAME: !Sub '${ProjectName}-Cart'
       Code:
-        S3Bucket: !FindInMap 
+        S3Bucket: !FindInMap
           - S3Buckets
           - !Ref 'AWS::Region'
           - Bucket
-        S3Key: !FindInMap 
+        S3Key: !FindInMap
           - Constants
           - S3Keys
           - AddToCartCode
@@ -1551,8 +1551,8 @@ Resources:
       Description: Remove a book from cart
       Handler: index.handler
       MemorySize: 256
-      Runtime: nodejs10.x
-      Role: !GetAtt 
+      Runtime: nodejs8.10
+      Role: !GetAtt
         - DynamoDbRole
         - Arn
       Timeout: 120
@@ -1560,11 +1560,11 @@ Resources:
         Variables:
           TABLE_NAME: !Sub '${ProjectName}-Cart'
       Code:
-        S3Bucket: !FindInMap 
+        S3Bucket: !FindInMap
           - S3Buckets
           - !Ref 'AWS::Region'
           - Bucket
-        S3Key: !FindInMap 
+        S3Key: !FindInMap
           - Constants
           - S3Keys
           - RemoveFromCartCode
@@ -1578,8 +1578,8 @@ Resources:
       Description: Get list of books ordered by customerId
       Handler: index.handler
       MemorySize: 256
-      Runtime: nodejs10.x
-      Role: !GetAtt 
+      Runtime: nodejs8.10
+      Role: !GetAtt
         - DynamoDbRole
         - Arn
       Timeout: 120
@@ -1588,11 +1588,11 @@ Resources:
           ORDERS_TABLE: !Sub '${ProjectName}-Orders'
           CART_TABLE: !Sub '${ProjectName}-Cart'
       Code:
-        S3Bucket: !FindInMap 
+        S3Bucket: !FindInMap
           - S3Buckets
           - !Ref 'AWS::Region'
           - Bucket
-        S3Key: !FindInMap 
+        S3Key: !FindInMap
           - Constants
           - S3Keys
           - CheckoutCode
@@ -1606,28 +1606,28 @@ Resources:
       FunctionName: !Sub '${ProjectName}-UploadBooks'
       Description: Upload sample data for books
       Handler: index.handler
-      Runtime: nodejs10.x
-      Role: !GetAtt 
+      Runtime: nodejs8.10
+      Role: !GetAtt
         - DynamoDbRole
         - Arn
       Timeout: 120
       Environment:
         Variables:
           TABLE_NAME: !Sub '${ProjectName}-Books'
-          S3_BUCKET: !FindInMap 
-                    - S3Buckets
-                    - !Ref 'AWS::Region'
-                    - Bucket
-          FILE_NAME: !FindInMap 
-                    - Constants
-                    - S3Keys
-                    - booksData
+          S3_BUCKET: !FindInMap
+            - S3Buckets
+            - !Ref 'AWS::Region'
+            - Bucket
+          FILE_NAME: !FindInMap
+            - Constants
+            - S3Keys
+            - booksData
       Code:
-        S3Bucket: !FindInMap 
+        S3Bucket: !FindInMap
           - S3Buckets
           - !Ref 'AWS::Region'
           - Bucket
-        S3Key: !FindInMap 
+        S3Key: !FindInMap
           - Constants
           - S3Keys
           - UploadBooksCode
@@ -1635,18 +1635,18 @@ Resources:
       'AWS::CloudFormation::Designer':
         id: 9c3f4191-a370-4344-a5b1-626228919c47
 
-# ---------- LAMBDA FUNCTIONS for NEPTUNE ---------  
+  # ---------- LAMBDA FUNCTIONS for NEPTUNE ---------
 
   FunctionGetRecommendations:
     Type: 'AWS::Lambda::Function'
     Properties:
       FunctionName: !Sub '${ProjectName}-GetRecommendations'
       Code:
-        S3Bucket: !FindInMap 
+        S3Bucket: !FindInMap
           - S3Buckets
           - !Ref 'AWS::Region'
           - Bucket
-        S3Key: !FindInMap 
+        S3Key: !FindInMap
           - Constants
           - S3Keys
           - GetRecommendationsCode
@@ -1674,18 +1674,18 @@ Resources:
     Properties:
       FunctionName: !Sub '${ProjectName}-GetRecommendationsByBook'
       Code:
-        S3Bucket: !FindInMap 
+        S3Bucket: !FindInMap
           - S3Buckets
           - !Ref 'AWS::Region'
           - Bucket
-        S3Key: !FindInMap 
+        S3Key: !FindInMap
           - Constants
           - S3Keys
           - GetRecommendationsByBookCode
       Description: Get friends who purchased this book
       Environment:
         Variables:
-          neptunedb: !GetAtt bookstoreNeptuneCluster.Endpoint 
+          neptunedb: !GetAtt bookstoreNeptuneCluster.Endpoint
       Handler: index.handler
       MemorySize: 256
       Role:
@@ -1700,8 +1700,8 @@ Resources:
         SubnetIds:
           - Ref: bookstoreSubnet1
           - Ref: bookstoreSubnet2
-        
-# ---------- LAMBDA FUNCTIONS for ELASTICSEARCH and ELASTICACHE  ---------          
+
+  # ---------- LAMBDA FUNCTIONS for ELASTICSEARCH and ELASTICACHE  ---------
   FunctionSearch:
     Type: 'AWS::Lambda::Function'
     DependsOn:
@@ -1713,7 +1713,7 @@ Resources:
       Description: Search for books across book names, authors, and categories
       Handler: index.handler
       MemorySize: 256
-      Role: !GetAtt 
+      Role: !GetAtt
         - ESSearchRole
         - Arn
       Runtime: python2.7
@@ -1721,21 +1721,21 @@ Resources:
       VpcConfig:
         SecurityGroupIds:
           - Fn::GetAtt: [bookstoreVPC, DefaultSecurityGroup]
-       #   - Ref: bookstoreSecurityGroup
+        #   - Ref: bookstoreSecurityGroup
         SubnetIds:
           - Ref: bookstoreSubnet1
       Code:
-        S3Bucket: !FindInMap 
+        S3Bucket: !FindInMap
           - S3Buckets
           - !Ref 'AWS::Region'
           - Bucket
-        S3Key: !FindInMap 
+        S3Key: !FindInMap
           - Constants
           - S3Keys
           - SearchCode
       Environment:
         Variables:
-          ESENDPOINT: !GetAtt 
+          ESENDPOINT: !GetAtt
             - ElasticsearchDomain
             - DomainEndpoint
           REGION: !Ref 'AWS::Region'
@@ -1753,7 +1753,7 @@ Resources:
       Role: !GetAtt
         - RedisRole
         - Arn
-      Runtime: nodejs10.x
+      Runtime: nodejs8.10
       Timeout: '60'
       VpcConfig:
         SecurityGroupIds:
@@ -1761,28 +1761,28 @@ Resources:
         SubnetIds:
           - Ref: bookstoreSubnet1
       Code:
-        S3Bucket: !FindInMap 
+        S3Bucket: !FindInMap
           - S3Buckets
           - !Ref 'AWS::Region'
           - Bucket
-        S3Key: !FindInMap 
+        S3Key: !FindInMap
           - Constants
           - S3Keys
           - GetBestSellersCode
       Environment:
         Variables:
-          URL: !GetAtt 
+          URL: !GetAtt
             - ElastiCacheCluster
-            - RedisEndpoint.Address          
-  
- # ---------- LAMBDA PERMISSIONS ---------    
+            - RedisEndpoint.Address
+
+  # ---------- LAMBDA PERMISSIONS ---------
   FunctionListOrdersPermissions:
     Type: 'AWS::Lambda::Permission'
     Properties:
       Action: 'lambda:InvokeFunction'
       FunctionName: !Ref FunctionListOrders
       Principal: apigateway.amazonaws.com
-      SourceArn: !Join 
+      SourceArn: !Join
         - ''
         - - 'arn:aws:execute-api:'
           - !Ref 'AWS::Region'
@@ -1800,7 +1800,7 @@ Resources:
       Action: 'lambda:InvokeFunction'
       FunctionName: !Ref FunctionGetRecommendations
       Principal: apigateway.amazonaws.com
-      SourceArn: !Join 
+      SourceArn: !Join
         - ''
         - - 'arn:aws:execute-api:'
           - !Ref 'AWS::Region'
@@ -1815,7 +1815,7 @@ Resources:
       Action: 'lambda:InvokeFunction'
       FunctionName: !Ref FunctionGetRecommendationsByBook
       Principal: apigateway.amazonaws.com
-      SourceArn: !Join 
+      SourceArn: !Join
         - ''
         - - 'arn:aws:execute-api:'
           - !Ref 'AWS::Region'
@@ -1823,14 +1823,14 @@ Resources:
           - !Ref 'AWS::AccountId'
           - ':'
           - !Ref AppApi
-          - /* 
+          - /*
   FunctionGetBookPermissions:
     Type: 'AWS::Lambda::Permission'
     Properties:
       Action: 'lambda:InvokeFunction'
       FunctionName: !Ref FunctionGetBook
       Principal: apigateway.amazonaws.com
-      SourceArn: !Join 
+      SourceArn: !Join
         - ''
         - - 'arn:aws:execute-api:'
           - !Ref 'AWS::Region'
@@ -1848,7 +1848,7 @@ Resources:
       Action: 'lambda:InvokeFunction'
       FunctionName: !Ref FunctionListBooks
       Principal: apigateway.amazonaws.com
-      SourceArn: !Join 
+      SourceArn: !Join
         - ''
         - - 'arn:aws:execute-api:'
           - !Ref 'AWS::Region'
@@ -1866,7 +1866,7 @@ Resources:
       Action: 'lambda:InvokeFunction'
       FunctionName: !Ref FunctionUpdateCart
       Principal: apigateway.amazonaws.com
-      SourceArn: !Join 
+      SourceArn: !Join
         - ''
         - - 'arn:aws:execute-api:'
           - !Ref 'AWS::Region'
@@ -1884,7 +1884,7 @@ Resources:
       Action: 'lambda:InvokeFunction'
       FunctionName: !Ref FunctionGetCartItem
       Principal: apigateway.amazonaws.com
-      SourceArn: !Join 
+      SourceArn: !Join
         - ''
         - - 'arn:aws:execute-api:'
           - !Ref 'AWS::Region'
@@ -1902,7 +1902,7 @@ Resources:
       Action: 'lambda:InvokeFunction'
       FunctionName: !Ref FunctionListItemsInCart
       Principal: apigateway.amazonaws.com
-      SourceArn: !Join 
+      SourceArn: !Join
         - ''
         - - 'arn:aws:execute-api:'
           - !Ref 'AWS::Region'
@@ -1920,7 +1920,7 @@ Resources:
       Action: 'lambda:InvokeFunction'
       FunctionName: !Ref FunctionAddToCart
       Principal: apigateway.amazonaws.com
-      SourceArn: !Join 
+      SourceArn: !Join
         - ''
         - - 'arn:aws:execute-api:'
           - !Ref 'AWS::Region'
@@ -1938,7 +1938,7 @@ Resources:
       Action: 'lambda:InvokeFunction'
       FunctionName: !Ref FunctionRemoveFromCart
       Principal: apigateway.amazonaws.com
-      SourceArn: !Join 
+      SourceArn: !Join
         - ''
         - - 'arn:aws:execute-api:'
           - !Ref 'AWS::Region'
@@ -1956,7 +1956,7 @@ Resources:
       Action: 'lambda:InvokeFunction'
       FunctionName: !Ref FunctionCheckout
       Principal: apigateway.amazonaws.com
-      SourceArn: !Join 
+      SourceArn: !Join
         - ''
         - - 'arn:aws:execute-api:'
           - !Ref 'AWS::Region'
@@ -1974,7 +1974,7 @@ Resources:
       Action: 'lambda:InvokeFunction'
       FunctionName: !Ref FunctionSearch
       Principal: apigateway.amazonaws.com
-      SourceArn: !Join 
+      SourceArn: !Join
         - ''
         - - 'arn:aws:execute-api:'
           - !Ref 'AWS::Region'
@@ -1992,7 +1992,7 @@ Resources:
       Action: 'lambda:InvokeFunction'
       FunctionName: !Ref FunctionGetBestSellers
       Principal: apigateway.amazonaws.com
-      SourceArn: !Join 
+      SourceArn: !Join
         - ''
         - - 'arn:aws:execute-api:'
           - !Ref 'AWS::Region'
@@ -2003,9 +2003,9 @@ Resources:
           - /*
     Metadata:
       'AWS::CloudFormation::Designer':
-        id: 06a821b7-638e-471c-ab50-51710b73767c  
+        id: 06a821b7-638e-471c-ab50-51710b73767c
 
- # ---------- API GATEWAY ---------         
+  # ---------- API GATEWAY ---------
   AppApi:
     Type: 'AWS::ApiGateway::RestApi'
     Properties:
@@ -2025,12 +2025,12 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Join 
+        Uri: !Join
           - ''
           - - 'arn:aws:apigateway:'
             - !Ref 'AWS::Region'
             - ':lambda:path/2015-03-31/functions/'
-            - !GetAtt 
+            - !GetAtt
               - FunctionGetRecommendations
               - Arn
             - /invocations
@@ -2081,12 +2081,12 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Join 
+        Uri: !Join
           - ''
           - - 'arn:aws:apigateway:'
             - !Ref 'AWS::Region'
             - ':lambda:path/2015-03-31/functions/'
-            - !GetAtt 
+            - !GetAtt
               - FunctionGetRecommendationsByBook
               - Arn
             - /invocations
@@ -2128,7 +2128,7 @@ Resources:
             method.response.header.Access-Control-Allow-Headers: true
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
-          StatusCode: '200'        
+          StatusCode: '200'
   BooksApiRequestGET:
     DependsOn:
       - FunctionListOrdersPermissions
@@ -2139,12 +2139,12 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Join 
+        Uri: !Join
           - ''
           - - 'arn:aws:apigateway:'
             - !Ref 'AWS::Region'
             - ':lambda:path/2015-03-31/functions/'
-            - !GetAtt 
+            - !GetAtt
               - FunctionListBooks
               - Arn
             - /invocations
@@ -2202,12 +2202,12 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Join 
+        Uri: !Join
           - ''
           - - 'arn:aws:apigateway:'
             - !Ref 'AWS::Region'
             - ':lambda:path/2015-03-31/functions/'
-            - !GetAtt 
+            - !GetAtt
               - FunctionGetBook
               - Arn
             - /invocations
@@ -2267,12 +2267,12 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Join 
+        Uri: !Join
           - ''
           - - 'arn:aws:apigateway:'
             - !Ref 'AWS::Region'
             - ':lambda:path/2015-03-31/functions/'
-            - !GetAtt 
+            - !GetAtt
               - FunctionListOrders
               - Arn
             - /invocations
@@ -2296,12 +2296,12 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Join 
+        Uri: !Join
           - ''
           - - 'arn:aws:apigateway:'
             - !Ref 'AWS::Region'
             - ':lambda:path/2015-03-31/functions/'
-            - !GetAtt 
+            - !GetAtt
               - FunctionCheckout
               - Arn
             - /invocations
@@ -2357,12 +2357,12 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Join 
+        Uri: !Join
           - ''
           - - 'arn:aws:apigateway:'
             - !Ref 'AWS::Region'
             - ':lambda:path/2015-03-31/functions/'
-            - !GetAtt 
+            - !GetAtt
               - FunctionListItemsInCart
               - Arn
             - /invocations
@@ -2386,12 +2386,12 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Join 
+        Uri: !Join
           - ''
           - - 'arn:aws:apigateway:'
             - !Ref 'AWS::Region'
             - ':lambda:path/2015-03-31/functions/'
-            - !GetAtt 
+            - !GetAtt
               - FunctionAddToCart
               - Arn
             - /invocations
@@ -2415,12 +2415,12 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Join 
+        Uri: !Join
           - ''
           - - 'arn:aws:apigateway:'
             - !Ref 'AWS::Region'
             - ':lambda:path/2015-03-31/functions/'
-            - !GetAtt 
+            - !GetAtt
               - FunctionUpdateCart
               - Arn
             - /invocations
@@ -2444,12 +2444,12 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Join 
+        Uri: !Join
           - ''
           - - 'arn:aws:apigateway:'
             - !Ref 'AWS::Region'
             - ':lambda:path/2015-03-31/functions/'
-            - !GetAtt 
+            - !GetAtt
               - FunctionRemoveFromCart
               - Arn
             - /invocations
@@ -2507,12 +2507,12 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Join 
+        Uri: !Join
           - ''
           - - 'arn:aws:apigateway:'
             - !Ref 'AWS::Region'
             - ':lambda:path/2015-03-31/functions/'
-            - !GetAtt 
+            - !GetAtt
               - FunctionGetCartItem
               - Arn
             - /invocations
@@ -2570,12 +2570,12 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Join 
+        Uri: !Join
           - ''
           - - 'arn:aws:apigateway:'
             - !Ref 'AWS::Region'
             - ':lambda:path/2015-03-31/functions/'
-            - !GetAtt 
+            - !GetAtt
               - FunctionSearch
               - Arn
             - /invocations
@@ -2627,12 +2627,12 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Join 
+        Uri: !Join
           - ''
           - - 'arn:aws:apigateway:'
             - !Ref 'AWS::Region'
             - ':lambda:path/2015-03-31/functions/'
-            - !GetAtt 
+            - !GetAtt
               - FunctionGetBestSellers
               - Arn
             - /invocations
@@ -2673,12 +2673,12 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
           StatusCode: '200'
-          
+
   RecommendationsApiResource:
     Type: 'AWS::ApiGateway::Resource'
     Properties:
       RestApiId: !Ref AppApi
-      ParentId: !GetAtt 
+      ParentId: !GetAtt
         - AppApi
         - RootResourceId
       PathPart: recommendations
@@ -2687,12 +2687,12 @@ Resources:
     Properties:
       RestApiId: !Ref AppApi
       ParentId: !Ref RecommendationsApiResource
-      PathPart: '{bookId}'    
+      PathPart: '{bookId}'
   BooksApiResource:
     Type: 'AWS::ApiGateway::Resource'
     Properties:
       RestApiId: !Ref AppApi
-      ParentId: !GetAtt 
+      ParentId: !GetAtt
         - AppApi
         - RootResourceId
       PathPart: books
@@ -2712,7 +2712,7 @@ Resources:
     Type: 'AWS::ApiGateway::Resource'
     Properties:
       RestApiId: !Ref AppApi
-      ParentId: !GetAtt 
+      ParentId: !GetAtt
         - AppApi
         - RootResourceId
       PathPart: orders
@@ -2723,7 +2723,7 @@ Resources:
     Type: 'AWS::ApiGateway::Resource'
     Properties:
       RestApiId: !Ref AppApi
-      ParentId: !GetAtt 
+      ParentId: !GetAtt
         - AppApi
         - RootResourceId
       PathPart: cart
@@ -2743,7 +2743,7 @@ Resources:
     Type: 'AWS::ApiGateway::Resource'
     Properties:
       RestApiId: !Ref AppApi
-      ParentId: !GetAtt 
+      ParentId: !GetAtt
         - AppApi
         - RootResourceId
       PathPart: search
@@ -2751,10 +2751,10 @@ Resources:
     Type: 'AWS::ApiGateway::Resource'
     Properties:
       RestApiId: !Ref AppApi
-      ParentId: !GetAtt 
+      ParentId: !GetAtt
         - AppApi
         - RootResourceId
-      PathPart: bestsellers 
+      PathPart: bestsellers
 
   ApiAuthorizer:
     Type: 'AWS::ApiGateway::Authorizer'
@@ -2763,7 +2763,7 @@ Resources:
       IdentitySource: method.request.header.Authorization
       Name: CognitoDefaultUserPoolAuthorizer
       ProviderARNs:
-        - !GetAtt 
+        - !GetAtt
           - UserPool
           - Arn
       RestApiId: !Ref AppApi
@@ -2804,7 +2804,7 @@ Resources:
       'AWS::CloudFormation::Designer':
         id: 278dda65-02c9-49fa-a19c-3dd7afd25683
 
-# ---------- COGNITO DEFINITIONS ---------           
+  # ---------- COGNITO DEFINITIONS ---------
   SNSRole:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -2867,7 +2867,7 @@ Resources:
       AllowUnauthenticatedIdentities: true
       CognitoIdentityProviders:
         - ClientId: !Ref UserPoolClient
-          ProviderName: !GetAtt 
+          ProviderName: !GetAtt
             - UserPool
             - ProviderName
   CognitoUnAuthorizedRole:
@@ -2926,7 +2926,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - 'execute-api:Invoke'
-                Resource: !Join 
+                Resource: !Join
                   - ''
                   - - 'arn:aws:execute-api:'
                     - !Ref 'AWS::Region'
@@ -2940,10 +2940,10 @@ Resources:
     Properties:
       IdentityPoolId: !Ref IdentityPool
       Roles:
-        authenticated: !GetAtt 
+        authenticated: !GetAtt
           - CognitoAuthorizedRole
           - Arn
-        unauthenticated: !GetAtt 
+        unauthenticated: !GetAtt
           - CognitoUnAuthorizedRole
           - Arn
   BooksUploader:
@@ -2951,12 +2951,12 @@ Resources:
     Properties:
       ServiceToken: !GetAtt FunctionUploadBooks.Arn
       ParameterOne: Parameter to pass into Custom Lambda Function
-      DependsOn: 
-       - FunctionUploadBooks
-       - UpdateSearchCluster
-       - ElasticsearchDomain
+      DependsOn:
+        - FunctionUploadBooks
+        - UpdateSearchCluster
+        - ElasticsearchDomain
 
-# ------------------------ FRONTEND ------------------------
+  # ------------------------ FRONTEND ------------------------
   AssetsCodeRepository:
     Type: 'AWS::CodeCommit::Repository'
     Properties:
@@ -3052,11 +3052,11 @@ Resources:
                   - 's3:GetObjectVersion'
                   - 's3:GetBucketVersioning'
                 Resource:
-                  - !Join 
+                  - !Join
                     - ''
                     - - !GetAtt AssetsBucket.Arn
                       - /*
-                  - !Join 
+                  - !Join
                     - ''
                     - - !GetAtt PipelineArtifactsBucket.Arn
                       - /*
@@ -3109,8 +3109,8 @@ Resources:
                   'Fn::Join':
                     - ''
                     - - 'Fn::GetAtt':
-                        - PipelineArtifactsBucket
-                        - Arn
+                          - PipelineArtifactsBucket
+                          - Arn
                       - /*
                 Effect: Allow
         - PolicyName: codebuild-for-pipeline
@@ -3119,7 +3119,7 @@ Resources:
               - Action:
                   - 'codebuild:BatchGetBuilds'
                   - 'codebuild:StartBuild'
-                Resource: !GetAtt 
+                Resource: !GetAtt
                   - CodeBuildProject
                   - Arn
                 Effect: Allow
@@ -3170,8 +3170,8 @@ Resources:
                 - npm run build
             post_build:
               commands:
-                - echo Uploading to AssetsBucket 
-                - aws s3 cp --recursive ./build s3://${AssetsBucketName}/ 
+                - echo Uploading to AssetsBucket
+                - aws s3 cp --recursive ./build s3://${AssetsBucketName}/
                 - aws s3 cp --cache-control="max-age=0, no-cache, no-store, must-revalidate" ./build/service-worker.js s3://${AssetsBucket}/
                 - aws s3 cp --cache-control="max-age=0, no-cache, no-store, must-revalidate" ./build/index.html s3://${AssetsBucket}/
                 - aws cloudfront create-invalidation --distribution-id ${AssetsCDN} --paths /index.html /service-worker.js
@@ -3179,7 +3179,7 @@ Resources:
           artifacts:
             files:
               - '**/*'
-            base-directory: build        
+            base-directory: build
       Tags:
         - Key: app-name
           Value: !Ref ProjectName
@@ -3191,7 +3191,7 @@ Resources:
     Type: 'AWS::CodePipeline::Pipeline'
     Properties:
       Name: !Sub '${ProjectName}-Assets-Pipeline'
-      RoleArn: !GetAtt 
+      RoleArn: !GetAtt
         - CodePipelineRole
         - Arn
       ArtifactStore:
@@ -3235,14 +3235,14 @@ Resources:
   SeederFunction:
     Properties:
       Code:
-        S3Bucket: !FindInMap 
+        S3Bucket: !FindInMap
           - S3Buckets
           - !Ref 'AWS::Region'
           - SeederFunctionBucket
-        S3Key: !FindInMap 
-         - Constants
-         - S3Keys
-         - SeederFunctionCode
+        S3Key: !FindInMap
+          - Constants
+          - S3Keys
+          - SeederFunctionCode
       Description: CodeCommit repository seeder
       Handler: seeder.SeedRepositoryHandler
       MemorySize: 3008
@@ -3285,11 +3285,11 @@ Resources:
   CreateESRoleFunction:
     Properties:
       Code:
-        S3Bucket: !FindInMap 
+        S3Bucket: !FindInMap
           - S3Buckets
           - !Ref 'AWS::Region'
           - Bucket
-        S3Key: !FindInMap 
+        S3Key: !FindInMap
           - Constants
           - S3Keys
           - CreateESRoleCode
@@ -3299,7 +3299,7 @@ Resources:
         'Fn::GetAtt':
           - CreateESRole
           - Arn
-      Runtime: nodejs10.x
+      Runtime: nodejs8.10
       Timeout: 300
     Type: 'AWS::Lambda::Function'
   ESRoleCreator:
@@ -3314,11 +3314,11 @@ Resources:
   UpdateConfigFunction:
     Properties:
       Code:
-        S3Bucket: !FindInMap 
+        S3Bucket: !FindInMap
           - S3Buckets
           - !Ref 'AWS::Region'
           - Bucket
-        S3Key: !FindInMap 
+        S3Key: !FindInMap
           - Constants
           - S3Keys
           - UpdateConfigCode
@@ -3328,7 +3328,7 @@ Resources:
         'Fn::GetAtt':
           - SeederRole
           - Arn
-      Runtime: nodejs10.x
+      Runtime: nodejs8.10
       Timeout: 300
       Environment:
         Variables:
@@ -3410,56 +3410,56 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Designer':
         id: 63b08124-fccb-4874-ab13-ce6cfe6ce885
-  ScheduledRuleSearchRecs: 
+  ScheduledRuleSearchRecs:
     Type: AWS::Events::Rule
-    Properties: 
+    Properties:
       ScheduleExpression: "rate(10 minutes)"
       State: "ENABLED"
-      Targets: 
-        - 
-          Arn: 
-            Fn::GetAtt: 
+      Targets:
+        -
+          Arn:
+            Fn::GetAtt:
               - "FunctionSearch"
               - "Arn"
           Id: "SearchTarget"
-          Input: "{\"queryStringParameters\":{\"q\":\"Umami\"}}" 
+          Input: "{\"queryStringParameters\":{\"q\":\"Umami\"}}"
         -
           Arn:
             Fn::GetAtt:
               - "FunctionGetRecommendations"
               - "Arn"
           Id: "GetRecommendationTarget"
-          Input: "{\"source\":\"warmer\"}" 
+          Input: "{\"source\":\"warmer\"}"
         -
           Arn:
             Fn::GetAtt:
               - "FunctionGetBestSellers"
               - "Arn"
-          Id: "GetBestsellersTarget"   
-          Input: "{\"source\":\"warmer\"}" 
-        - 
-          Arn: 
-            Fn::GetAtt: 
+          Id: "GetBestsellersTarget"
+          Input: "{\"source\":\"warmer\"}"
+        -
+          Arn:
+            Fn::GetAtt:
               - "FunctionGetRecommendationsByBook"
               - "Arn"
           Id: "GetRecommendationByBookTarget"
-          Input: "{\"queryStringParameters\":{\"bookId\":\"zceo3fdn-d93b-11e8-9f8b-f2801f1b9fd1\"}}" 
-        - 
-          Arn: 
-            Fn::GetAtt: 
+          Input: "{\"queryStringParameters\":{\"bookId\":\"zceo3fdn-d93b-11e8-9f8b-f2801f1b9fd1\"}}"
+        -
+          Arn:
+            Fn::GetAtt:
               - "FunctionGetBook"
               - "Arn"
           Id: "BookTarget"
           Input: "{\"source\":\"warmer\"}"
-  ScheduledRuleCart: 
+  ScheduledRuleCart:
     Type: AWS::Events::Rule
-    Properties: 
+    Properties:
       ScheduleExpression: "rate(10 minutes)"
       State: "ENABLED"
-      Targets: 
-        - 
-          Arn: 
-            Fn::GetAtt: 
+      Targets:
+        -
+          Arn:
+            Fn::GetAtt:
               - "FunctionAddToCart"
               - "Arn"
           Id: "AddToCartTarget"
@@ -3469,38 +3469,38 @@ Resources:
             Fn::GetAtt:
               - "FunctionUpdateCart"
               - "Arn"
-          Id: "UpdateCartTarget"    
+          Id: "UpdateCartTarget"
           Input: "{\"source\":\"warmer\"}"
         -
           Arn:
             Fn::GetAtt:
               - "FunctionListItemsInCart"
               - "Arn"
-          Id: "ListItemsInCartTarget"   
+          Id: "ListItemsInCartTarget"
           Input: "{\"source\":\"warmer\"}"
-        - 
-          Arn: 
-            Fn::GetAtt: 
+        -
+          Arn:
+            Fn::GetAtt:
               - "FunctionRemoveFromCart"
               - "Arn"
           Id: "RemoveFromCartTarget"
           Input: "{\"source\":\"warmer\"}"
-        - 
-          Arn: 
-            Fn::GetAtt: 
+        -
+          Arn:
+            Fn::GetAtt:
               - "FunctionGetCartItem"
               - "Arn"
           Id: "GetCartItemTarget"
           Input: "{\"source\":\"warmer\"}"
-  ScheduledRuleOrdersBooks: 
+  ScheduledRuleOrdersBooks:
     Type: AWS::Events::Rule
-    Properties: 
+    Properties:
       ScheduleExpression: "rate(10 minutes)"
       State: "ENABLED"
-      Targets: 
-        - 
-          Arn: 
-            Fn::GetAtt: 
+      Targets:
+        -
+          Arn:
+            Fn::GetAtt:
               - "FunctionCheckout"
               - "Arn"
           Id: "CheckoutTarget"
@@ -3510,18 +3510,18 @@ Resources:
             Fn::GetAtt:
               - "FunctionListOrders"
               - "Arn"
-          Id: "ListOrdersTarget"    
+          Id: "ListOrdersTarget"
           Input: "{\"source\":\"warmer\"}"
         -
           Arn:
             Fn::GetAtt:
               - "FunctionListBooks"
               - "Arn"
-          Id: "ListBooksTarget"   
+          Id: "ListBooksTarget"
           Input: "{\"source\":\"warmer\"}"
-        - 
-          Arn: 
-            Fn::GetAtt: 
+        -
+          Arn:
+            Fn::GetAtt:
               - "FunctionGetBook"
               - "Arn"
           Id: "GetBookTarget"

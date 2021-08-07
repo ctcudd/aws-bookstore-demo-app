@@ -366,7 +366,7 @@ Resources:
         S3Bucket: !FindInMap 
           - S3Buckets
           - !Ref 'AWS::Region'
-          - Bucket
+          - ConfigBucket
         S3Key: !FindInMap 
           - Constants
           - S3Keys
