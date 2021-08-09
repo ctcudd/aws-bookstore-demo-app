@@ -7,11 +7,11 @@ function createLayerZip(){
 
   pushd temp
   cp -r  ../../layers/${d}/* .
-  if [[ $dir == node* ]]; then
+  if [[ $d == node* ]]; then
     pushd nodejs
     npm install
     popd
-  elif [[ $dir == python* ]]; then
+  elif [[ $d == python* ]]; then
     pushd python
     pip install -r requirements.txt --target .
     popd
